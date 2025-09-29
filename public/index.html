@@ -1,29 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- ===== Meta ===== -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Anonymous</title>
   <meta name="theme-color" content="#4a90e2" />
-
-  <!-- ===== Favicon & Manifest ===== -->
   <link rel="shortcut icon" href="favicon1.png" type="image/x-icon" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/path-to-your-icon/apple-touch-icon.png" />
-
-  <!-- ===== CSS Libraries ===== -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
   <link rel="stylesheet" href="styles/index.css" />
-
-  <!-- ===== Inline Styles ===== -->
- 
 </head>
-
 <body>
   <div class="container">
-    <!-- Header -->
     <header>
       <div class="logo"><i class="fas fa-comments logo-icon"></i><h1>Anonymous</h1></div>
       <div class="header-controls">
@@ -34,71 +24,54 @@
         </div>
       </div>
     </header>
-
-    <!-- Main -->
     <main class="main-content">
       <section class="chat-container">
         <div class="chat-header">
           <h2>Public Chat</h2>
           <button class="refresh-btn" id="refreshButton"><i class="fas fa-sync-alt"></i> Refresh</button>
         </div>
-
         <div class="messages-container" id="messages">
           <div class="empty-state"><i class="fas fa-comment-slash"></i><p>No messages yet. Be the first to post!</p></div>
         </div>
-
         <div class="typing-indicator" id="typingIndicator" style="display: none;">
           <div class="typing-dots"><span></span><span></span><span></span></div>
           <span id="typingUsers"></span>
         </div>
-
-        <!-- Message Editor -->
         <div class="message-editor" id="messageEditor">
           <button class="format-toggle" id="formatToggle" title="Toggle formatting options"><i class="fas fa-plus"></i></button>
           <div class="editor-container"><div id="editor-container" role="textbox" aria-multiline="true" title="Message editor"></div></div>
           <button class="send-button" id="sendButton" title="Send message" disabled><i class="fas fa-paper-plane"></i></button>
-
   <div id="redirectBtnUnique" class="redirect-btn" title="Go to Images" tabindex="0" aria-label="Redirect to images">
 <i class="fas fa-external-link-alt"></i>
           </div>
-          <!-- Toolbar -->
           <div class="ql-toolbar ql-snow" id="editorToolbar">
             <span class="ql-formats">
-              <button class="ql-bold"></button>
-              <button class="ql-italic"></button>
-              <button class="ql-underline"></button>
+              <button class="ql-bold" title="Bold"></button>
+              <button class="ql-italic" title="Italic"></button>
+              <button class="ql-underline" title="Underline"></button>
             </span>
-
-            <!-- Wallpaper Button -->
             <div class="wallpaper-btn" id="wallpaperBtn" title="Change wallpaper" role="button" tabindex="0" aria-label="Change chat wallpaper">
               <i class="fas fa-image"></i>
             </div>
-
             <span class="ql-formats">
-              <button class="ql-list" value="ordered"></button>
-              <button class="ql-list" value="bullet"></button>
+              <button class="ql-list" value="ordered" title="Ordered List"></button>
+              <button class="ql-list" value="bullet" title="Bullet List"></button>
             </span>
             <span class="ql-formats">
-              <button class="ql-link"></button>
+              <button class="ql-link" title="Insert Link"></button>
             </span>
           </div>
-
-          <!-- Redirect Button (floating above X/toolbar) -->
           <div id="redirectBtn" class="redirect-btn" title="Go to Images" tabindex="0" aria-label="Redirect to images">
 <i class="fas fa-external-link-alt"></i>
           </div>
         </div>
-
         <div class="char-counter"><span id="messageCharCount">0</span>/2500 characters</div>
       </section>
-
-      <!-- Sidebar / User Section -->
       <aside class="user-section">
         <div class="user-profile">
           <div class="user-avatar" id="userAvatar">?</div>
           <div class="username-display" id="displayUsername">Guest</div>
         </div>
-
         <div id="registerScreen" class="overlay-screen">
           <div class="overlay-content">
             <h2>Welcome to WhisperWall!</h2>
@@ -110,41 +83,29 @@
             <button id="registerButton" disabled>Register</button>
           </div>
         </div>
-
         <div id="chatScreen" class="chat-screen" style="display: none;">
           <p><i class="fas fa-comments"></i> You're all set! Start chatting below.</p>
         </div>
-
         <div class="notification" id="notification" style="display: none;">
           <i class="fas fa-info-circle"></i>
           <span id="notificationText"></span>
         </div>
-
         <a href="help.html" id="help-btn" class="floating-action-btn" title="Help">
           <i class="fas fa-question-circle"></i>
         </a>
       </aside>
     </main>
-
     <footer class="footer">
       <p>&copy; 2025 <span class="brand">Anonymous</span>. All rights reserved.</p>
     </footer>
   </div>
-
-  <!-- Mobile Send Button -->
   <button class="mobile-send-button" id="mobileSendButton"><i class="fas fa-paper-plane"></i></button>
-
-  <!-- ===== JS Libraries ===== -->
   <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-  <!-- Custom Scripts -->
   <script src="scripts/ghgh.js"></script>
-
-  <script>
-    // Wallpaper button already handled in your script
+ <script>
     const redirectBtn = document.getElementById('redirectBtn');
     if (redirectBtn) {
       redirectBtn.addEventListener('click', () => window.location.href = 'image.html');
