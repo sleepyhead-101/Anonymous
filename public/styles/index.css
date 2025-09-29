@@ -830,17 +830,39 @@ header {
 .send-button {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  padding: 8px 14px;
-  border-radius: 40px;
+  padding: 10px 16px;
+  border-radius: 50px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.25s ease;
-  backdrop-filter: blur(8px) saturate(150%);
-  box-shadow: 0 2px 6px var(--shadow-light);
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px) saturate(180%);
+  box-shadow: 0 4px 12px var(--shadow-light);
+}
+
+.send-button:hover {
+  background: var(--primary-light);
+  color: white;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 18px var(--shadow-medium);
+}
+
+.send-button:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 2px 8px var(--shadow-light);
+}
+
+@media (max-width: 600px) {
+  .send-button {
+    padding: 10px 16px;
+    border-radius: 50px;
+    font-size: 15px;
+    gap: 8px;
+  }
 }
 .format-toggle {
   margin-right: 8px;
