@@ -828,21 +828,20 @@ header {
 .format-toggle,
 
 .send-button {
-  border: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 40px;
   cursor: pointer;
-  padding: 6px;
-  font-size: 18px;
-  border-radius: 50%;
-  width: 38px;
-  height: 15px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: background-color 0.25s ease, transform 0.2s ease, color 0.25s ease;
-  background: none;
-  color: var(--rimary);
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(8px) saturate(150%);
+  box-shadow: 0 2px 6px var(--shadow-light);
 }
-
 .format-toggle {
   margin-right: 8px;
 }
@@ -1665,34 +1664,5 @@ button:focus {
   to {
       opacity: 1;
       transform: translateY(0);
-  }
-}
-.mobile-send-button {
-  display: none;
-  position: fixed;
-  bottom: 120px;
-  right: 25px;
-  width: 35px;
-  height: 35px;
-  border-radius: 50%;
-  background: var(--primary-gradient);
-  color: white;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  transition: all 0.3s ease;
-}
-
-.mobile-send-button:hover {
-  transform: scale(1.1);
-}
-
-@media (max-width: 768px) {
-  .mobile-send-button {
-      display: flex;
-      align-items: center;
-      justify-content: center;
   }
 }
