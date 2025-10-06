@@ -614,4 +614,101 @@
 .return-btn:active {
   transform: translateY(0);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+
+}
+
+/* Reactions Styles */
+.reactions-container {
+    margin: 10px 0;
+}
+
+.reactions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.reaction-count {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    padding: 4px 8px;
+    border-radius: 16px;
+    font-size: 12px;
+    cursor: default;
+}
+
+.reaction-buttons {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.reaction-btn {
+    background: none;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.reaction-btn:hover {
+    background: #f8f9fa;
+    transform: scale(1.1);
+}
+
+/* Auth and User Styles */
+.auth-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+}
+
+.auth-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.user-info {
+    font-size: 14px;
+    color: #495057;
+    font-weight: 500;
+}
+
+.user-badge {
+    background: #007bff;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 20px;
+    color: #dee2e6;
+}
+
+/* Online indicator */
+.online-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #28a745;
+    border-radius: 50%;
+    margin-right: 5px;
 }
