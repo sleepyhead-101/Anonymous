@@ -1,4 +1,5 @@
-// Image Gallery with Firebase
+//image gallery//
+       
 document.addEventListener('DOMContentLoaded', function() {
     // Firebase Configuration
     const firebaseConfig = {
@@ -33,107 +34,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search-input');
     const filterSelect = document.getElementById('filter-select');
     const sortSelect = document.getElementById('sort-select');
-    
-    // Add auth UI elements
-    const authContainer = document.createElement('div');
-    authContainer.className = 'auth-container';
-    authContainer.innerHTML = `
-        <div class="auth-buttons">
-            <button id="signin-btn" class="btn btn-primary">
-                <i class="fas fa-sign-in-alt"></i> Sign In
-            </button>
-            <button id="signout-btn" class="btn btn-secondary" style="display: none;">
-                <i class="fas fa-sign-out-alt"></i> Sign Out
-            </button>
-        </div>
-        <div id="user-info" class="user-info" style="display: none;">
-            <span id="user-email"></span>
-        </div>
-    `;
-    document.querySelector('.gallery-header').prepend(authContainer);
-
-    const signinBtn = document.getElementById('signin-btn');
-    const signoutBtn = document.getElementById('signout-btn');
-    const userInfo = document.getElementById('user-info');
-    const userEmail = document.getElementById('user-email');
 
     // Store images with metadata
-    let images = [];
+    let images = JSON.parse(localStorage.getItem('galleryImages')) || [];
     let currentUser = null;
-
-    // Authentication functions
-    function initAuth() {
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                currentUser = user;
-                userEmail.textContent = user.email;
-                userInfo.style.display = 'block';
-                signinBtn.style.display = 'none';
-                signoutBtn.style.display = 'block';
-                initGallery();
-            } else {
-                currentUser = null;
-                userInfo.style.display = 'none';
-                signinBtn.style.display = 'block';
-                signoutBtn.style.display = 'none';
-                images = [];
-                renderGallery(images);
-                showAlert('Please sign in to view and upload images', 'info');
-            }
-        });
-
-        signinBtn.addEventListener('click', signIn);
-        signoutBtn.addEventListener('click', signOut);
-    }
-
-    function signIn() {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider)
-            .then((result) => {
-                showAlert('Signed in successfully!', 'success');
-            })
-            .catch((error) => {
-                showAlert('Sign in failed: ' + error.message);
-            });
-    }
-
-    function signOut() {
-        auth.signOut()
-            .then(() => {
-                showAlert('Signed out successfully', 'info');
-            })
-            .catch((error) => {
-                showAlert('Sign out failed: ' + error.message);
-            });
-    }
-
+    
     // Initialize gallery
     function initGallery() {
-        if (!currentUser) return;
-        
-        loadImagesFromFirebase();
-        cleanupExpiredImages();
-    }
-
-    // Load images from Firebase
-    function loadImagesFromFirebase() {
-        const imagesRef = db.ref('images');
-        
-        imagesRef.orderByChild('uploaded').once('value')
-            .then((snapshot) => {
-                images = [];
-                snapshot.forEach((childSnapshot) => {
-                    const imageData = childSnapshot.val();
-                    // Only show images that haven't expired
-                    if (new Date(imageData.expiry) > new Date()) {
-                        images.unshift(imageData); // Add to beginning for newest first
-                    }
-                });
-                renderGallery(images);
-            })
-            .catch((error) => {
-                showAlert('Error loading images: ' + error.message);
-            });
+        cleanupExpiredImages(); // Remove expired first
+        renderGallery(images);
     }
 
     // Render gallery with filtering/sorting
@@ -145,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="empty-state">
                     <i class="fas fa-images"></i>
                     <h3>No images available</h3>
-                    <p>${currentUser ? 'Upload your first image to get started!' : 'Please sign in to view images'}</p>
+                    <p>Upload your first image to get started!</p>
                 </div>
             `;
             return;
@@ -181,14 +90,12 @@ document.addEventListener('DOMContentLoaded', function() {
         card.innerHTML = `
             <div class="card-header">
                 <span class="expiry-tag ${timeRemaining <= 0 ? 'expired' : ''}">${timeText}</span>
-                ${img.userId === currentUser?.uid ? '<span class="user-badge">Your Image</span>' : ''}
             </div>
             <img src="${img.src}" alt="${img.caption || 'User uploaded image'}" class="protected-image">
             <div class="image-meta">
                 <p class="image-caption">${img.caption || 'No caption provided'}</p>
                 <div class="image-footer">
                     <span><i class="far fa-calendar-alt"></i> ${new Date(img.uploaded).toLocaleDateString()}</span>
-                    ${img.userEmail ? `<span><i class="fas fa-user"></i> ${img.userEmail.split('@')[0]}</span>` : ''}
                 </div>
             </div>
         `;
@@ -213,8 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Search
         if (searchTerm) {
             filtered = filtered.filter(img => 
-                (img.caption || '').toLowerCase().includes(searchTerm) ||
-                (img.userEmail || '').toLowerCase().includes(searchTerm)
+                (img.caption || '').toLowerCase().includes(searchTerm)
             );
         }
 
@@ -223,8 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const soon = new Date();
             soon.setHours(soon.getHours() + 24);
             filtered = filtered.filter(img => new Date(img.expiry) < soon);
-        } else if (filterValue === 'my-images') {
-            filtered = filtered.filter(img => img.userId === currentUser?.uid);
         }
 
         // Sort
@@ -245,15 +149,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Cleanup expired images
     function cleanupExpiredImages() {
         const now = new Date();
-        const expiredImages = images.filter(img => new Date(img.expiry) <= now);
-        
-        expiredImages.forEach(img => {
-            // Remove from Firebase
-            db.ref('images/' + img.id).remove()
-                .catch(error => {
-                    console.error('Error removing expired image:', error);
-                });
-        });
+        images = images.filter(img => new Date(img.expiry) > now);
+        localStorage.setItem('galleryImages', JSON.stringify(images));
     }
 
     // Drag and drop handlers
@@ -275,10 +172,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function highlight() {
-        if (!currentUser) {
-            showAlert('Please sign in to upload images', 'info');
-            return;
-        }
         uploadArea.classList.add('active');
     }
 
@@ -288,19 +181,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // File handling
     uploadArea.addEventListener('drop', handleDrop, false);
-    uploadArea.addEventListener('click', () => {
-        if (!currentUser) {
-            showAlert('Please sign in to upload images', 'info');
-            return;
-        }
-        fileInput.click();
-    });
+    uploadArea.addEventListener('click', () => fileInput.click());
 
     function handleDrop(e) {
-        if (!currentUser) {
-            showAlert('Please sign in to upload images', 'info');
-            return;
-        }
         const dt = e.dataTransfer;
         handleFiles(dt.files);
     }
@@ -310,11 +193,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function handleFiles(files) {
-        if (!currentUser) {
-            showAlert('Please sign in to upload images', 'info');
-            return;
-        }
-
         if (files.length > 0) {
             const file = files[0];
             if (file.type.match('image.*')) {
@@ -356,13 +234,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // Upload process
+    // Upload process - Updated with Firebase
     uploadBtn.addEventListener('click', function() {
-        if (!currentUser) {
-            showAlert('Please sign in to upload images', 'info');
-            return;
-        }
-
         if (fileInput.files.length > 0) {
             uploadFile(fileInput.files[0]);
         }
@@ -384,60 +257,103 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = '<div class="loading"></div> Uploading...';
         
-        // Upload to Firebase Storage
-        const storageRef = storage.ref();
-        const imageId = Date.now().toString();
-        const imageRef = storageRef.child(`images/${imageId}_${file.name}`);
-        
-        const uploadTask = imageRef.put(file);
-        
-        uploadTask.on('state_changed',
-            (snapshot) => {
-                // Progress tracking
-                const progressValue = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        // Check if user is signed in
+        if (currentUser) {
+            // Upload to Firebase Storage
+            const storageRef = storage.ref();
+            const imageId = Date.now().toString();
+            const imageRef = storageRef.child(`images/${imageId}_${file.name}`);
+            
+            const uploadTask = imageRef.put(file);
+            
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    // Progress tracking
+                    const progressValue = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    progress.style.width = progressValue + '%';
+                },
+                (error) => {
+                    // Handle errors
+                    showAlert('Upload failed: ' + error.message);
+                    resetUploadForm();
+                },
+                () => {
+                    // Upload completed
+                    uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+                        // Create image data
+                        const expiryDate = new Date();
+                        expiryDate.setDate(expiryDate.getDate() + expiryDays);
+                        
+                        const imageData = {
+                            id: imageId,
+                            src: downloadURL,
+                            caption: caption,
+                            expiry: expiryDate.toISOString(),
+                            uploaded: new Date().toISOString(),
+                            userId: currentUser.uid,
+                            userEmail: currentUser.email
+                        };
+                        
+                        // Save to Firebase Database
+                        db.ref('images/' + imageId).set(imageData)
+                            .then(() => {
+                                // Also save to local storage for offline access
+                                images.unshift(imageData);
+                                localStorage.setItem('galleryImages', JSON.stringify(images));
+                                
+                                resetUploadForm();
+                                progressBar.style.display = 'none';
+                                renderGallery(images);
+                                showAlert('Image uploaded successfully to cloud!', 'success');
+                                
+                                // Auto-scroll to show new upload
+                                gallery.scrollIntoView({ behavior: 'smooth' });
+                            })
+                            .catch((error) => {
+                                showAlert('Error saving to cloud: ' + error.message);
+                                resetUploadForm();
+                            });
+                    });
+                }
+            );
+        } else {
+            // Fallback to local storage only
+            let progressValue = 0;
+            const progressInterval = setInterval(() => {
+                progressValue += Math.random() * 10;
+                if (progressValue >= 100) {
+                    progressValue = 100;
+                    clearInterval(progressInterval);
+                    
+                    setTimeout(() => {
+                        // Create image data
+                        const expiryDate = new Date();
+                        expiryDate.setDate(expiryDate.getDate() + expiryDays);
+                        
+                        const imageData = {
+                            id: Date.now().toString(),
+                            src: imagePreview.src,
+                            caption: caption,
+                            expiry: expiryDate.toISOString(),
+                            uploaded: new Date().toISOString()
+                        };
+                        
+                        images.unshift(imageData); // Add to beginning
+                        localStorage.setItem('galleryImages', JSON.stringify(images));
+                        
+                        resetUploadForm();
+                        progressBar.style.display = 'none';
+                        renderGallery(images);
+                        showAlert('Image uploaded successfully to local storage!', 'success');
+                        
+                        // Auto-scroll to show new upload
+                        gallery.scrollIntoView({ behavior: 'smooth' });
+                        
+                    }, 500);
+                }
                 progress.style.width = progressValue + '%';
-            },
-            (error) => {
-                // Handle errors
-                showAlert('Upload failed: ' + error.message);
-                resetUploadForm();
-            },
-            () => {
-                // Upload completed
-                uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
-                    // Create image data for database
-                    const expiryDate = new Date();
-                    expiryDate.setDate(expiryDate.getDate() + expiryDays);
-                    
-                    const imageData = {
-                        id: imageId,
-                        src: downloadURL,
-                        caption: caption,
-                        expiry: expiryDate.toISOString(),
-                        uploaded: new Date().toISOString(),
-                        userId: currentUser.uid,
-                        userEmail: currentUser.email,
-                        fileName: file.name
-                    };
-                    
-                    // Save to Firebase Database
-                    db.ref('images/' + imageId).set(imageData)
-                        .then(() => {
-                            resetUploadForm();
-                            progressBar.style.display = 'none';
-                            loadImagesFromFirebase(); // Reload images
-                            showAlert('Image uploaded successfully!', 'success');
-                            
-                            // Auto-scroll to show new upload
-                            gallery.scrollIntoView({ behavior: 'smooth' });
-                        })
-                        .catch((error) => {
-                            showAlert('Error saving image data: ' + error.message);
-                            resetUploadForm();
-                        });
-                });
-            }
-        );
+            }, 200);
+        }
     }
 
     function resetUploadForm() {
@@ -451,8 +367,55 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload Image';
     }
 
+    // Load images from Firebase on startup
+    function loadImagesFromFirebase() {
+        db.ref('images').once('value')
+            .then((snapshot) => {
+                const firebaseImages = [];
+                snapshot.forEach((childSnapshot) => {
+                    const imageData = childSnapshot.val();
+                    // Only show images that haven't expired
+                    if (new Date(imageData.expiry) > new Date()) {
+                        firebaseImages.push(imageData);
+                    }
+                });
+                
+                // Merge with local images, remove duplicates
+                const localImages = JSON.parse(localStorage.getItem('galleryImages')) || [];
+                const allImages = [...firebaseImages, ...localImages];
+                
+                // Remove duplicates based on ID
+                const uniqueImages = allImages.filter((image, index, self) =>
+                    index === self.findIndex((t) => t.id === image.id)
+                );
+                
+                images = uniqueImages;
+                localStorage.setItem('galleryImages', JSON.stringify(images));
+                renderGallery(images);
+            })
+            .catch((error) => {
+                console.log('Error loading from Firebase:', error);
+                // Continue with local storage only
+                initGallery();
+            });
+    }
+
+    // Authentication state observer
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            currentUser = user;
+            console.log('User signed in:', user.email);
+            loadImagesFromFirebase();
+        } else {
+            currentUser = null;
+            console.log('User signed out');
+            // Use local storage only when signed out
+            initGallery();
+        }
+    });
+
     // Initialize
-    initAuth();
+    loadImagesFromFirebase();
 
     // Additional protection against image saving
     document.addEventListener('contextmenu', function(e) {
