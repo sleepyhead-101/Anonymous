@@ -18,6 +18,153 @@ document.addEventListener('DOMContentLoaded', function() {
     const auth = firebase.auth();
     const storage = firebase.storage();
 
+    // Set Firebase security rules programmatically (for reference - actual rules should be set in Firebase Console)
+    const securityRules = {
+        "rules": {
+            "images": {
+                ".read": "auth != null",
+                "$imageId": {
+                    ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid)",
+                    ".validate": "
+                        newData.hasChildren(['src', 'caption', 'expiry', 'uploaded', 'userId', 'userEmail']) &&
+                        newData.child('src').isString() &&
+                        newData.child('caption').isString() &&
+                        newData.child('caption').val().length <= 1000 &&
+                        newData.child('expiry').isNumber() &&
+                        newData.child('expiry').val() > now &&
+                        newData.child('uploaded').isNumber() &&
+                        newData.child('uploaded').val() <= now &&
+                        newData.child('userId').val() == auth.uid &&
+                        newData.child('userEmail').isString() &&
+                        newData.child('userEmail').val().contains('@')
+                    "
+                }
+            },
+            
+            "image_reactions": {
+                ".read": "auth != null",
+                "$imageId": {
+                    "$userId": {
+                        ".write": "auth != null && $userId == auth.uid",
+                        ".validate": "
+                            newData.isString() &&
+                            newData.val().length > 0 &&
+                            newData.val().length <= 5 &&
+                            (
+                            newData.val() == '👍' ||
+                            newData.val() == '💜' ||
+                            newData.val() == '😂' ||
+                            newData.val() == '😮' ||
+                            newData.val() == '👎' ||
+                            newData.val() == '🔥'
+                            )
+                        "
+                    }
+                }
+            },
+
+            "users": {
+                ".read": "auth != null",
+                "$username": {
+                    ".write": "
+                        auth != null &&
+                        (!data.exists() || data.child('uid').val() == auth.uid) &&
+                        $username.matches(/^[a-zA-Z0-9_]{3,20}$/)
+                    ",
+                    ".validate": "
+                        newData.hasChild('uid') &&
+                        newData.child('uid').val() == auth.uid &&
+                        (!newData.hasChild('role') ||
+                        newData.child('role').val() == 'new' ||
+                        newData.child('role').val() == 'vip' ||
+                        newData.child('role').val() == 'admin' ||
+                        newData.child('role').val() == 'system')
+                    "
+                }
+            },
+
+            "users_by_uid": {
+                ".read": "auth != null",
+                "$uid": {
+                    ".write": "auth != null && $uid == auth.uid",
+                    ".validate": "
+                        newData.hasChild('username') &&
+                        newData.child('username').isString() &&
+                        newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/) &&
+                        (!newData.hasChild('role') ||
+                        newData.child('role').val() == 'new' ||
+                        newData.child('role').val() == 'vip' ||
+                        newData.child('role').val() == 'admin' ||
+                        newData.child('role').val() == 'system')
+                    "
+                }
+            },
+
+            "online": {
+                ".read": "auth != null",
+                "$username": {
+                    ".write": "
+                        auth != null &&
+                        root.child('users').child($username).child('uid').val() == auth.uid
+                    ",
+                    ".validate": "newData.isBoolean()"
+                }
+            },
+
+            "messages": {
+                ".read": true,
+                "$messageId": {
+                    ".write": "auth != null && (!data.exists() || data.child('uid').val() == auth.uid)",
+                    ".validate": "
+                        newData.hasChild('timestamp') &&
+                        newData.child('timestamp').isNumber() &&
+                        newData.child('timestamp').val() > (now - 302400000) &&
+                        (
+                        !data.exists() ||
+                        (
+                            newData.hasChildren(['uid', 'username', 'message', 'plainText', 'timestamp']) &&
+                            newData.child('uid').val() == auth.uid &&
+                            newData.child('username').isString() &&
+                            newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/) &&
+                            newData.child('message').isString() &&
+                            newData.child('plainText').isString() &&
+                            newData.child('plainText').val().length > 0 &&
+                            newData.child('plainText').val().length <= 2500 &&
+                            newData.child('timestamp').val() <= now
+                        )
+                        )
+                    "
+                }
+            },
+
+            "reactions": {
+                ".read": true,
+                "$messageId": {
+                    "$username": {
+                        ".write": "
+                            auth != null &&
+                            root.child('users').child($username).child('uid').val() == auth.uid &&
+                            root.child('messages').child($messageId).exists()
+                        ",
+                        ".validate": "
+                            newData.isString() &&
+                            newData.val().length > 0 &&
+                            newData.val().length <= 5 &&
+                            (
+                            newData.val() == '👍' ||
+                            newData.val() == '💜' ||
+                            newData.val() == '😂' ||
+                            newData.val() == '😮' ||
+                            newData.val() == '👎' ||
+                            newData.val() == '🔥'
+                            )
+                        "
+                    }
+                }
+            }
+        }
+    };
+
     // DOM Elements
     const uploadArea = document.getElementById('upload-area');
     const fileInput = document.getElementById('file-input');
@@ -93,15 +240,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Create a simple username from email
         const username = user.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 20);
         
-        // Update users node
+        // Update users node according to security rules
         const userData = {
             uid: user.uid,
             email: user.email,
-            role: 'new', // Default role
-            lastSeen: firebase.database.ServerValue.TIMESTAMP
+            role: 'new' // Default role as per security rules
         };
         
-        // Update both users and users_by_uid nodes to match your security rules
+        // Update both users and users_by_uid nodes to match security rules
         db.ref('users/' + username).set(userData);
         db.ref('users_by_uid/' + user.uid).set({
             username: username,
@@ -155,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
         cleanupExpiredImages();
     }
 
-    // Load images from Firebase
+    // Load images from Firebase using the new images node
     function loadImagesFromFirebase() {
         const imagesRef = db.ref('images');
         
@@ -164,9 +310,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 images = [];
                 snapshot.forEach((childSnapshot) => {
                     const imageData = childSnapshot.val();
-                    // Only show images that haven't expired
-                    if (new Date(imageData.expiry) > new Date()) {
-                        images.unshift(imageData); // Add to beginning for newest first
+                    // Convert timestamp back to Date for comparison
+                    const expiryDate = new Date(imageData.expiry);
+                    if (expiryDate > new Date()) {
+                        images.unshift(imageData);
                     }
                 });
                 renderGallery(images);
@@ -180,7 +327,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function setupRealtimeUpdates() {
         db.ref('images').on('child_added', (snapshot) => {
             const imageData = snapshot.val();
-            if (new Date(imageData.expiry) > new Date() && !images.find(img => img.id === imageData.id)) {
+            const expiryDate = new Date(imageData.expiry);
+            if (expiryDate > new Date() && !images.find(img => img.id === imageData.id)) {
                 images.unshift(imageData);
                 renderGallery(images);
             }
@@ -214,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Create image card component with reactions
+    // Create image card component with reactions using image_reactions node
     function createImageCard(img) {
         const expiry = new Date(img.expiry);
         const now = new Date();
@@ -260,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
-        // Load reactions for this image
+        // Load reactions for this image from image_reactions node
         loadReactions(img.id, card.querySelector('.reactions'));
         
         // Add reaction button event listeners
@@ -278,9 +426,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return card;
     }
 
-    // Reaction handling functions
+    // Reaction handling functions using image_reactions node
     function loadReactions(imageId, reactionsContainer) {
-        db.ref('reactions/' + imageId).on('value', (snapshot) => {
+        db.ref('image_reactions/' + imageId).on('value', (snapshot) => {
             const reactions = snapshot.val() || {};
             const reactionCounts = {};
             
@@ -305,10 +453,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const emoji = event.target.dataset.emoji;
         const imageId = event.target.dataset.imageId;
-        const username = currentUser.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 20);
         
-        // Check if user already reacted with this emoji
-        const userReactionRef = db.ref('reactions/' + imageId + '/' + username);
+        // Use image_reactions node instead of reactions node
+        const userReactionRef = db.ref('image_reactions/' + imageId + '/' + currentUser.uid);
         
         userReactionRef.once('value').then((snapshot) => {
             if (snapshot.exists() && snapshot.val() === emoji) {
@@ -366,14 +513,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const expiredImages = images.filter(img => new Date(img.expiry) <= now);
         
         expiredImages.forEach(img => {
-            // Remove from Firebase
+            // Remove from Firebase images node
             db.ref('images/' + img.id).remove()
                 .catch(error => {
                     console.error('Error removing expired image:', error);
                 });
                 
-            // Also remove reactions for expired images
-            db.ref('reactions/' + img.id).remove();
+            // Also remove reactions from image_reactions node
+            db.ref('image_reactions/' + img.id).remove();
         });
     }
 
@@ -477,7 +624,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // Upload process
+    // Upload process - updated to match security rules requirements
     uploadBtn.addEventListener('click', function() {
         if (!currentUser) {
             showAlert('Please sign in to upload images', 'info');
@@ -498,6 +645,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Validate
         if (!file.type.match('image.*')) {
             showAlert('Please select a valid image file');
+            return;
+        }
+
+        // Validate caption length according to security rules
+        if (caption.length > 1000) {
+            showAlert('Caption must be 1000 characters or less');
             return;
         }
 
@@ -526,7 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
             () => {
                 // Upload completed
                 uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
-                    // Create image data for database
+                    // Create image data for database according to security rules
                     const expiryDate = new Date();
                     expiryDate.setDate(expiryDate.getDate() + expiryDays);
                     
@@ -534,12 +687,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         id: imageId,
                         src: downloadURL,
                         caption: caption,
-                        expiry: expiryDate.toISOString(),
-                        uploaded: new Date().toISOString(),
+                        expiry: expiryDate.getTime(), // Use timestamp for security rule validation
+                        uploaded: Date.now(), // Use timestamp for security rule validation
                         userId: currentUser.uid,
                         userEmail: currentUser.email,
-                        fileName: file.name,
-                        timestamp: Date.now()
+                        fileName: file.name
                     };
                     
                     // Save to Firebase Database under 'images' node
