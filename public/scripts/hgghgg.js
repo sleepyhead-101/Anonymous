@@ -179,9 +179,19 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadArea.classList.remove('active');
     }
 
-    // File handling
+    // Fixed file handling - better click event
     uploadArea.addEventListener('drop', handleDrop, false);
-    uploadArea.addEventListener('click', () => fileInput.click());
+    
+    // Fix for upload area click
+    uploadArea.addEventListener('click', function(e) {
+        // Only trigger if the click is directly on the upload area, not on child elements
+        if (e.target === uploadArea) {
+            fileInput.click();
+        }
+    });
+
+    // Also make the entire upload area clickable via CSS if needed
+    uploadArea.style.cursor = 'pointer';
 
     function handleDrop(e) {
         const dt = e.dataTransfer;
@@ -189,7 +199,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     fileInput.addEventListener('change', function() {
-        handleFiles(this.files);
+        if (this.files.length > 0) {
+            handleFiles(this.files);
+        }
     });
 
     function handleFiles(files) {
@@ -201,6 +213,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     reader.onload = function(e) {
                         imagePreview.src = e.target.result;
                         previewContainer.style.display = 'block';
+                        // Enable upload button when image is loaded
+                        uploadBtn.disabled = false;
                     };
                     reader.readAsDataURL(file);
                 } else {
@@ -238,6 +252,8 @@ document.addEventListener('DOMContentLoaded', function() {
     uploadBtn.addEventListener('click', function() {
         if (fileInput.files.length > 0) {
             uploadFile(fileInput.files[0]);
+        } else {
+            showAlert('Please select an image first');
         }
     });
 
