@@ -1,121 +1,480 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Anonymous</title>
-  <meta name="theme-color" content="#4a90e2" />
-  <link rel="shortcut icon" href="favicon1.png" type="image/x-icon" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/path-to-your-icon/apple-touch-icon.png" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
-  <link rel="stylesheet" href="styles/index.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="WhisperWall — anonymous ephemeral chat for secure, private messaging">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#7c6dfa">
+  <meta name="color-scheme" content="dark light">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WhisperWall">
+
+  <meta property="og:title" content="WhisperWall">
+  <meta property="og:description" content="Anonymous ephemeral chat — no account needed">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="favicon1.png">
+  <meta property="og:url" content="https://whisperwalldemo.web.app">
+
+  <title>WhisperWall — Anonymous Chat</title>
+
+  <link rel="shortcut icon" href="favicon1.png" type="image/x-icon">
+  <link rel="apple-touch-icon" href="favicon1.png">
+  <link rel="manifest" href="/manifest.json">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="preconnect" href="https://www.gstatic.com">
+
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles/index.css">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo"><i class="fas fa-comments logo-icon"></i><h1>Anonymous</h1></div>
-      <div class="header-controls">
-        <div class="online-indicator"><div class="online-dot"></div><span><span id="onlineCount">0</span> online</span></div>
-        <div class="theme-toggle" id="themeToggle" role="button" tabindex="0">
-          <i class="fas fa-sun"></i><i class="fas fa-moon"></i>
-          <div class="theme-toggle-thumb"></div>
+
+<noscript>
+  <div class="noscript-screen" role="alert">
+    <img src="favicon1.png" alt="" width="48" height="48" class="noscript-icon" onerror="this.style.display='none'">
+    <span class="noscript-emoji" aria-hidden="true">🤫</span>
+    <strong>WhisperWall requires JavaScript</strong>
+    <p>Please enable JavaScript in your browser settings to use WhisperWall.</p>
+  </div>
+</noscript>
+
+<!-- Skip-to-content — keyboard / screen-reader users -->
+<a href="#main-content" class="skip-link">Skip to chat</a>
+
+<!-- Mobile sidebar backdrop -->
+<div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+
+<div class="app-wrap">
+
+  <!-- ═══ HEADER ═══════════════════════════════════════════ -->
+  <header role="banner">
+    <div class="header-left">
+      <button class="menu-btn" id="menuToggle"
+              aria-label="Open user panel"
+              aria-expanded="false"
+              aria-controls="sidebar"
+              type="button">
+        <i class="fas fa-bars" aria-hidden="true"></i>
+      </button>
+
+      <div class="logo" role="img" aria-label="WhisperWall">
+        <div class="logo-glyph" aria-hidden="true">
+          <i class="fas fa-comment-dots"></i>
+        </div>
+        <span class="logo-wordmark" aria-hidden="true">Whisper<span>Wall</span></span>
+      </div>
+    </div>
+
+    <div class="header-right" role="group" aria-label="Status and controls">
+      <div class="pill" id="connectionStatus"
+           role="status"
+           aria-label="Connection status"
+           aria-live="polite">
+        <div class="conn-dot" aria-hidden="true"></div>
+        <span class="conn-label">Connecting…</span>
+      </div>
+
+      <div class="pill">
+        <div class="dot-live" aria-hidden="true"></div>
+        <span><span id="onlineCount" aria-label="Users online">0</span> online</span>
+      </div>
+
+      <!-- Sound toggle injected by Sound.init() -->
+
+      <button class="icon-square-btn" id="themeToggle"
+              aria-label="Toggle dark/light mode"
+              type="button">
+        <i class="fas fa-sun sun-icon" aria-hidden="true"></i>
+        <i class="fas fa-moon moon-icon" aria-hidden="true"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══ MAIN ══════════════════════════════════════════════ -->
+  <main class="main-content" id="main-content" tabindex="-1">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar" aria-labelledby="sidebar-heading">
+      <h2 id="sidebar-heading" class="sr-only">User panel</h2>
+
+      <button class="sidebar-close" id="sidebarClose"
+              aria-label="Close user panel"
+              type="button">
+        <i class="fas fa-xmark" aria-hidden="true"></i>
+      </button>
+
+      <!-- User card -->
+      <div class="user-card">
+        <div class="avatar" id="userAvatar" aria-hidden="true">?</div>
+        <div class="uname" id="displayUsername" aria-label="Your username">Guest</div>
+        <div class="ubadge">Anonymous</div>
+      </div>
+
+      <!-- Online users -->
+      <p class="sidebar-label" aria-hidden="true">Online now</p>
+      <div class="online-list" id="onlineList"
+           aria-label="Online users"
+           role="list"></div>
+
+      <!-- Quick actions -->
+      <nav class="sidebar-actions" aria-label="Quick actions">
+        <a href="image.html" class="side-btn" aria-label="Open image gallery">
+          <i class="fas fa-images" aria-hidden="true"></i> Gallery
+        </a>
+        <a href="help.html" class="side-btn" aria-label="Get help">
+          <i class="fas fa-question-circle" aria-hidden="true"></i> Help
+        </a>
+      </nav>
+
+      <footer class="sidebar-foot" aria-label="App info">
+        <span class="sidebar-version">v3.1</span>
+        <span class="sidebar-tagline">Messages vanish in 5 days 👻</span>
+      </footer>
+    </aside>
+
+    <!-- CHAT -->
+    <section class="chat-area" aria-labelledby="chat-heading">
+
+      <div class="chat-topbar">
+        <div class="chat-topbar-left">
+          <h2 id="chat-heading" class="channel-name">Public Chat</h2>
+          <span class="channel-tag" aria-label="Channel: general">#general</span>
+        </div>
+        <div class="chat-topbar-right">
+          <button class="refresh-btn" id="refreshButton"
+                  aria-label="Refresh messages"
+                  type="button">
+            <i class="fas fa-sync-alt" aria-hidden="true"></i>
+            <span>Refresh</span>
+          </button>
+          <button class="topbar-wallpaper-btn" id="wallpaperBtnTopbar"
+                  aria-label="Change wallpaper"
+                  title="Change wallpaper"
+                  type="button">
+            <i class="fas fa-image" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
-    </header>
-    <main class="main-content">
-      <section class="chat-container">
-        <div class="chat-header">
-          <h2>Public Chat</h2>
-          <button class="refresh-btn" id="refreshButton"><i class="fas fa-sync-alt"></i> Refresh</button>
+
+      <!-- Messages -->
+      <div class="messages-container"
+           id="messages"
+           role="log"
+           aria-live="polite"
+           aria-atomic="false"
+           aria-label="Chat messages">
+
+        <div class="empty-state" id="emptyState" aria-live="polite">
+          <i class="fas fa-comment-slash" aria-hidden="true"></i>
+          <p>No messages yet. Be the first to whisper!</p>
         </div>
-        <div class="messages-container" id="messages">
-          <div class="empty-state"><i class="fas fa-comment-slash"></i><p>No messages yet. Be the first to post!</p></div>
+
+        <button class="scroll-to-bottom"
+                id="scrollToBottomBtn"
+                aria-label="Scroll to latest messages"
+                type="button"
+                hidden>
+          <i class="fas fa-chevron-down" aria-hidden="true"></i>
+          <span class="unread-badge" id="unreadBadge" aria-live="polite" aria-atomic="true"></span>
+        </button>
+      </div>
+
+      <!-- Typing indicator -->
+      <div class="typing-bar"
+           id="typingIndicator"
+           role="status"
+           aria-live="polite"
+           aria-atomic="true"
+           hidden>
+        <div class="typing-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
         </div>
-        <div class="typing-indicator" id="typingIndicator" style="display: none;">
-          <div class="typing-dots"><span></span><span></span><span></span></div>
-          <span id="typingUsers"></span>
+        <span id="typingUsers"></span>
+      </div>
+
+      <!-- Composer -->
+      <div class="composer" role="form" aria-label="Compose message">
+        <div class="editor-wrap" id="editorWrap">
+          <div id="editor-container"
+               role="textbox"
+               aria-multiline="true"
+               aria-label="Message input"
+               aria-describedby="messageCharCount"></div>
         </div>
-        <div class="message-editor" id="messageEditor">
-          <button class="format-toggle" id="formatToggle" title="Toggle formatting options"><i class="fas fa-plus"></i></button>
-          <div class="editor-container"><div id="editor-container" role="textbox" aria-multiline="true" title="Message editor"></div></div>
-          <button class="send-button" id="sendButton" title="Send message" disabled><i class="fas fa-paper-plane"></i></button>
-  <div id="redirectBtnUnique" class="redirect-btn" title="Go to Images" tabindex="0" aria-label="Redirect to images">
-<i class="fas fa-external-link-alt"></i>
-          </div>
-          <div class="ql-toolbar ql-snow" id="editorToolbar">
-            <span class="ql-formats">
-              <button class="ql-bold" title="Bold"></button>
-              <button class="ql-italic" title="Italic"></button>
-              <button class="ql-underline" title="Underline"></button>
+
+        <!-- Emoji picker popup -->
+        <div class="emoji-tray"
+             id="emojiTray"
+             aria-hidden="true"
+             role="listbox"
+             aria-label="Emoji picker"
+             hidden></div>
+
+        <div class="composer-actions">
+          <div class="composer-left">
+            <span class="char-count" aria-live="polite">
+              <span id="messageCharCount">0</span>/2500
             </span>
-            <div class="wallpaper-btn" id="wallpaperBtn" title="Change wallpaper" role="button" tabindex="0" aria-label="Change chat wallpaper">
-              <i class="fas fa-image"></i>
-            </div>
-            <span class="ql-formats">
-              <button class="ql-list" value="ordered" title="Ordered List"></button>
-              <button class="ql-list" value="bullet" title="Bullet List"></button>
-            </span>
-            <span class="ql-formats">
-              <button class="ql-link" title="Insert Link"></button>
-            </span>
+            <a href="image.html" class="icon-btn" aria-label="Open image gallery" title="Gallery">
+              <i class="fas fa-images" aria-hidden="true"></i>
+            </a>
+            <button class="icon-btn emoji-btn"
+                    id="emojiToggleBtn"
+                    aria-label="Toggle emoji picker"
+                    aria-expanded="false"
+                    aria-controls="emojiTray"
+                    type="button">
+              <i class="fas fa-face-smile" aria-hidden="true"></i>
+            </button>
           </div>
-          <div id="redirectBtn" class="redirect-btn" title="Go to Images" tabindex="0" aria-label="Redirect to images">
-<i class="fas fa-external-link-alt"></i>
-          </div>
-        </div>
-        <div class="char-counter"><span id="messageCharCount">0</span>/2500 characters</div>
-      </section>
-      <aside class="user-section">
-        <div class="user-profile">
-          <div class="user-avatar" id="userAvatar">?</div>
-          <div class="username-display" id="displayUsername">Guest</div>
-        </div>
-        <div id="registerScreen" class="overlay-screen">
-          <div class="overlay-content">
-            <h2>Welcome to WhisperWall!</h2>
-            <p>Please choose a username to start chatting:</p>
-            <div class="input-group">
-              <input type="text" id="username" maxlength="20" placeholder="3-20 characters" />
-              <div class="char-count"><span id="usernameCharCount">0</span>/20</div>
-            </div>
-            <button id="registerButton" disabled>Register</button>
+
+          <div class="composer-right">
+            <span class="send-hint" aria-hidden="true">Ctrl+Enter</span>
+            <button class="send-btn"
+                    id="sendButton"
+                    disabled
+                    aria-disabled="true"
+                    aria-label="Send message (Ctrl+Enter or Cmd+Enter)"
+                    type="button">
+              <i class="fas fa-paper-plane" aria-hidden="true"></i>
+              <span>Send</span>
+            </button>
           </div>
         </div>
-        <div id="chatScreen" class="chat-screen" style="display: none;">
-          <p><i class="fas fa-comments"></i> You're all set! Start chatting below.</p>
-        </div>
-        <div class="notification" id="notification" style="display: none;">
-          <i class="fas fa-info-circle"></i>
-          <span id="notificationText"></span>
-        </div>
-        <a href="help.html" id="help-btn" class="floating-action-btn" title="Help">
-          <i class="fas fa-question-circle"></i>
-        </a>
-      </aside>
-    </main>
-    <footer class="footer">
-      <p>&copy; 2025 <span class="brand">Anonymous</span>. All rights reserved.</p>
-    </footer>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Wallpaper FAB -->
+  <button class="fab" id="wallpaperBtn"
+          aria-label="Change chat wallpaper"
+          title="Change wallpaper"
+          type="button">
+    <i class="fas fa-image" aria-hidden="true"></i>
+  </button>
+
+  <footer role="contentinfo">
+    <p>
+      &copy; 2025 <span class="brand">WhisperWall</span>.
+      Messages auto-delete after <strong>5 days</strong>.
+      <a href="help.html" class="footer-link">Help</a> ·
+      <a href="image.html" class="footer-link">Gallery</a>
+    </p>
+  </footer>
+
+</div><!-- /.app-wrap -->
+
+<!-- ═══ REGISTER OVERLAY ══════════════════════════════════ -->
+<div id="registerScreen"
+     class="overlay"
+     role="dialog"
+     aria-labelledby="register-heading"
+     aria-modal="true"
+     hidden>
+
+  <div class="register-card">
+    <div class="register-logo">
+      <div class="logo-glyph" aria-hidden="true">
+        <i class="fas fa-comment-dots"></i>
+      </div>
+      <h2 id="register-heading">WhisperWall</h2>
+    </div>
+
+    <p class="register-sub">
+      Choose a username to start chatting anonymously.<br>
+      No account, no email, no tracking.
+    </p>
+
+    <div class="input-group">
+      <label for="username">Username</label>
+      <input type="text"
+             id="username"
+             placeholder="e.g. shadow_fox"
+             maxlength="20"
+             autocomplete="off"
+             autocorrect="off"
+             autocapitalize="off"
+             spellcheck="false"
+             aria-required="true"
+             aria-describedby="usernameHint usernameStatus"
+             inputmode="text" />
+      <span class="input-hint" id="usernameHint">
+        Letters, numbers, underscores · 3–20 characters
+      </span>
+      <div class="input-row">
+        <span class="username-status" id="usernameStatus" aria-live="polite" role="status"></span>
+        <span class="char-sm"><span id="usernameCharCount">0</span>/20</span>
+      </div>
+    </div>
+
+    <button id="registerButton" class="enter-btn" disabled aria-disabled="true" type="button">
+      <i class="fas fa-arrow-right" aria-hidden="true"></i>
+      <span>Enter chat</span>
+    </button>
+
+    <p class="register-note">
+      <i class="fas fa-ghost" aria-hidden="true"></i>
+      Messages disappear after 5 days
+    </p>
   </div>
-  <button class="mobile-send-button" id="mobileSendButton"><i class="fas fa-paper-plane"></i></button>
-  <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="scripts/ghgh.js"></script>
- <script>
-    const redirectBtn = document.getElementById('redirectBtn');
-    if (redirectBtn) {
-      redirectBtn.addEventListener('click', () => window.location.href = 'image.html');
-      redirectBtn.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          redirectBtn.click();
+</div>
+
+<!-- Notification toast -->
+<div class="notif"
+     id="notification"
+     role="alert"
+     aria-live="assertive"
+     aria-atomic="true"
+     hidden>
+  <i class="fas fa-circle-check" aria-hidden="true"></i>
+  <span id="notificationText"></span>
+  <button class="notif-close" id="notifClose"
+          aria-label="Dismiss notification"
+          type="button">
+    <i class="fas fa-xmark" aria-hidden="true"></i>
+  </button>
+</div>
+
+<!-- External deps -->
+<script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<!-- App -->
+<script src="scripts/ghgh.js"></script>
+
+<!-- Inline UI wiring (sidebar, emoji tray, notification dismiss) -->
+<script>
+(function () {
+  'use strict';
+
+  /* ── Sidebar ─────────────────────────────── */
+  const menuBtn  = document.getElementById('menuToggle');
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  const closeBtn = document.getElementById('sidebarClose');
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    backdrop.classList.add('visible');
+    menuBtn.setAttribute('aria-expanded', 'true');
+    document.body.inert = false; // allow sidebar focus
+    document.body.style.overflow = 'hidden';
+    closeBtn?.focus();
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    backdrop.classList.remove('visible');
+    menuBtn.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    menuBtn?.focus();
+  }
+
+  menuBtn?.addEventListener('click', openSidebar);
+  closeBtn?.addEventListener('click', closeSidebar);
+  backdrop?.addEventListener('click', closeSidebar);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && sidebar.classList.contains('open')) closeSidebar();
+  });
+
+  /* ── Notification dismiss ─────────────────── */
+  document.getElementById('notifClose')?.addEventListener('click', () => {
+    const notif = document.getElementById('notification');
+    notif.hidden = true;
+  });
+
+  /* ── Topbar wallpaper alias ───────────────── */
+  document.getElementById('wallpaperBtnTopbar')?.addEventListener('click', () => {
+    window.changeWallpaper?.();
+  });
+
+  /* ── Emoji tray ───────────────────────────── */
+  const EMOJIS = [
+    '😀','😂','😍','🥰','😎','🤔','😮','😢','😡','🥳',
+    '👍','👎','❤️','💜','🔥','✨','💀','🎉','🫡','👀',
+    '🤯','😏','🙈','💪','🫶','🌚','🌝','👻','💅','🤌',
+    '😤','🥹','😭','🤣','😇','🫠','🤡','💩','👾','🎭',
+  ];
+
+  const tray      = document.getElementById('emojiTray');
+  const toggleBtn = document.getElementById('emojiToggleBtn');
+
+  if (tray && toggleBtn) {
+    const frag = document.createDocumentFragment();
+    EMOJIS.forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.type        = 'button';
+      btn.textContent = emoji;
+      btn.className   = 'emoji-tray-btn';
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-label', emoji);
+      btn.addEventListener('click', () => {
+        if (window.__wwQuill) {
+          const q     = window.__wwQuill;
+          const range = q.getSelection(true);
+          const idx   = range ? range.index : q.getLength();
+          q.insertText(idx, emoji, 'user');
+          q.setSelection(idx + emoji.length, 0);
+        } else {
+          const editor = document.querySelector('.ql-editor');
+          if (editor) { editor.focus(); document.execCommand('insertText', false, emoji); }
         }
+        closeTray();
+        toggleBtn.focus();
       });
+      frag.appendChild(btn);
+    });
+    tray.appendChild(frag);
+
+    function openTray() {
+      tray.hidden = false;
+      tray.setAttribute('aria-hidden', 'false');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+      tray.querySelector('button')?.focus();
     }
-  </script>
+
+    function closeTray() {
+      tray.hidden = true;
+      tray.setAttribute('aria-hidden', 'true');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    toggleBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      tray.hidden ? openTray() : closeTray();
+    });
+
+    tray.addEventListener('keydown', e => {
+      const btns = Array.from(tray.querySelectorAll('button'));
+      const idx  = btns.indexOf(document.activeElement);
+      if (e.key === 'ArrowRight' && idx < btns.length - 1) {
+        e.preventDefault(); btns[idx + 1].focus();
+      } else if (e.key === 'ArrowLeft' && idx > 0) {
+        e.preventDefault(); btns[idx - 1].focus();
+      } else if (e.key === 'Escape') {
+        closeTray(); toggleBtn.focus();
+      }
+    });
+
+    document.addEventListener('click', e => {
+      if (!tray.contains(e.target) && e.target !== toggleBtn && !tray.hidden) closeTray();
+    });
+  }
+})();
+</script>
+
 </body>
 </html>
