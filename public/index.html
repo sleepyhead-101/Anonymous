@@ -1,429 +1,313 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WhisperWall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
+<style>
+:root{--c-bg:#0c0c18;--c-bg2:#131324;--c-bg3:#18182a;--c-bg4:#222243;--tx:#f0eeff;--tx2:#c4c1de;--tx3:#9d9ab8;--bd:rgba(124,109,250,.16);--bd2:rgba(124,92,252,.3);--acc:#7c6dfa;--acc-s:#9b7dff;--btn:#6c5cf2;--red:#f87171;--amber:#fbbf24;--green:#4ade80;--bubble:#181830;--bubble-own:#2b2566;--r-sm:8px}
+body.light{--c-bg:#f6f5fc;--c-bg2:#fff;--c-bg3:#fff;--c-bg4:#eeebfb;--tx:#1a1733;--tx2:#46426b;--tx3:#6b6788;--bd:rgba(80,60,200,.14);--bd2:rgba(80,60,200,.3);--acc:#5b49e0;--acc-s:#5b49e0;--bubble:#fff;--bubble-own:#e4e0ff;--red:#dc2626;--green:#16a34a;--amber:#b45309}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{font:400 15px/1.5 Outfit,system-ui,sans-serif;background:var(--c-bg);color:var(--tx);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+button:disabled{cursor:not-allowed;opacity:.5}
+:focus-visible{outline:2px solid var(--acc-s);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-  <title>WhisperWall — Anonymous Ephemeral Chat</title>
+/* shared controls */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:10px;font-weight:500;border:1px solid var(--bd2);background:var(--c-bg4);transition:background .15s}
+.btn:hover:not(:disabled){background:var(--bd2)}
+.btn-primary{background:var(--btn);border-color:var(--btn);color:#fff}
+.btn-primary:hover:not(:disabled){background:#5a49e0}
+.btn-danger{color:var(--red);border-color:var(--red);background:transparent}
+.ib{width:40px;height:40px;border-radius:10px;display:inline-grid;place-items:center;color:var(--tx2)}
+.ib:hover{background:var(--c-bg4);color:var(--tx)}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:13px;color:var(--tx2)}
+.inp{width:100%;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--bd2);background:var(--c-bg2);font-size:16px}
+.inp:focus{border-color:var(--acc);outline:none}
+.hint{font-size:12px;color:var(--tx3);margin:0}
 
-  <!-- SEO -->
-  <meta name="description" content="Anonymous ephemeral chat with auto-deleting messages." />
-  <meta name="keywords" content="anonymous chat, whisperwall, ephemeral messaging" />
-  <meta name="robots" content="index, follow" />
+/* layout */
+.app-wrap{display:flex;height:100vh;height:100dvh;overflow:hidden}
+.chat-area{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.sidebar{width:288px;flex:none;display:flex;flex-direction:column;background:var(--c-bg2);border-right:1px solid var(--bd)}
+.app-wrap:has(#domainNameDisplay:empty) .sidebar{display:none}
+.side-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:500;letter-spacing:-.01em}
+.mark{width:22px;height:22px;border-radius:50%;border:2px solid var(--acc);box-shadow:0 0 0 5px rgba(124,109,250,.15) inset}
+.side-scroll{flex:1;overflow-y:auto;padding:0 12px 12px}
+.side-sec{padding:12px 4px;border-top:1px solid var(--bd)}
+.side-sec h2{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--tx3)}
+.side-foot{padding:10px 12px;border-top:1px solid var(--bd)}
+.nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:var(--r-sm);text-align:left;color:var(--tx2)}
+.nav-item:hover{background:var(--c-bg4);color:var(--tx)}
+.nav-item i{width:16px;text-align:center}
+.nav-item.danger{color:var(--red)}
+.tag{margin-left:auto;font-size:11px;color:var(--tx3)}
+.invite-link{padding:9px 11px;border-radius:var(--r-sm);background:var(--c-bg);border:1px solid var(--bd);font-size:12px;word-break:break-all;user-select:all;margin-bottom:8px}
+.admin-box{display:grid;gap:12px;padding:12px;margin-top:6px;border-radius:10px;background:var(--c-bg);border:1px solid var(--bd)}
+.row{display:flex;gap:8px}.row .inp{min-height:38px;font-size:14px}.row .btn{min-height:38px;padding:0 14px}
+.sidebar-backdrop{display:none}
+.online-user{display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:14px}
+.online-user .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none}
+.ubadge{font-size:11px;padding:1px 7px;border-radius:999px;background:rgba(124,109,250,.18);color:var(--acc-s);font-weight:500}
+.composer-btn{width:28px;height:28px;border-radius:6px;color:var(--tx3);display:inline-grid;place-items:center}
+.composer-btn:hover{background:var(--c-bg4);color:var(--red)}
 
-  <!-- Security -->
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta name="referrer" content="strict-origin-when-cross-origin" />
+/* top bar */
+.topbar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--bd);background:var(--c-bg2);padding-top:max(8px,env(safe-area-inset-top))}
+#menuToggle{display:none}
+.space-title{flex:1;min-width:0;font-size:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--c-bg4);font-size:13px;color:var(--tx2)}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--tx3);flex:none}
+.conn-dot.connected{background:var(--green)}.conn-dot.disconnected{background:var(--red)}
+.topbar-btn-label{margin-left:6px;font-size:14px}
+#refreshButton{width:auto;padding:0 12px}
 
-  <!-- Theme -->
-  <meta name="theme-color" content="#7c6dfa" />
-  <meta name="color-scheme" content="dark light" />
+/* messages */
+.messages-wrap{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;background:var(--c-bg)}
+#messages{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px;display:flex;flex-direction:column;gap:10px;scroll-behavior:auto}
+.empty{margin:auto;text-align:center;color:var(--tx3)}.empty i{font-size:26px;margin-bottom:8px;color:var(--acc)}
+.msg{display:flex;gap:10px;align-items:flex-start}
+.msg.own{flex-direction:row-reverse}
+.msg-avatar{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:600;color:#10101f}
+.msg-body{display:flex;flex-direction:column;min-width:0;max-width:min(640px,calc(100% - 92px))}
+.msg.own .msg-body{align-items:flex-end}
+.msg-meta{display:flex;gap:8px;align-items:baseline;font-size:12px;color:var(--tx3);margin-bottom:3px}
+.msg-author{display:inline-flex;gap:6px;align-items:center;font-weight:600;color:var(--tx2);font-size:13px}
+.msg-bubble{padding:9px 13px;border-radius:4px 14px 14px 14px;background:var(--bubble);border:1px solid var(--bd);overflow-wrap:anywhere}
+.msg.own .msg-bubble{border-radius:14px 4px 14px 14px;background:var(--bubble-own);border-color:var(--bd2)}
+.msg-grouped{margin-top:-8px}
+.msg-grouped .msg-avatar{visibility:hidden}.msg-grouped .msg-meta{display:none}
+.msg-grouped .msg-bubble{border-radius:14px}
+.msg-new .msg-bubble{box-shadow:0 0 0 2px var(--acc)}
+.msg-bubble p{margin:0}.msg-bubble p+p{margin-top:.5em}
+.msg-bubble a{color:var(--acc-s)}
+.msg-bubble blockquote{margin:.3em 0;padding-left:10px;border-left:3px solid var(--acc);color:var(--tx2)}
+.msg-bubble pre{margin:.4em 0;padding:8px 10px;background:var(--c-bg);border-radius:6px;overflow-x:auto;font-size:13px}
+.msg-bubble ul,.msg-bubble ol{margin:.3em 0;padding-left:1.3em}
+.msg-bubble img{max-width:min(100%,320px);border-radius:8px;display:block}
+.msg-reactions{position:relative;display:flex;flex-wrap:wrap;gap:0 4px;align-self:stretch}
+.msg.own .msg-reactions{justify-content:flex-end}
+.reaction{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:2px 8px;margin-top:4px;border-radius:999px;border:1px solid var(--bd);background:var(--bubble);font-size:13px}
+.reaction.active{border-color:var(--acc);background:rgba(124,109,250,.2)}
+.msg-reactions .reaction{min-height:30px}
+.msg-reactions .add-reaction{position:absolute;bottom:100%;left:100%;margin:0 0 0 6px;width:36px;height:36px;min-width:36px;padding:0;opacity:.55;color:var(--tx3)}
+.msg.own .add-reaction{left:auto;right:100%;margin:0 6px 0 0}
+@media (hover:hover) and (pointer:fine){
+  .msg-reactions .reaction{min-width:0;min-height:26px}
+  .msg-reactions .add-reaction{width:28px;height:28px;min-width:28px;min-height:28px;opacity:0}
+  .msg:hover .add-reaction,.add-reaction:focus-visible{opacity:1}
+}
+.emoji-picker-popup{position:absolute;bottom:calc(100% + 6px);left:0;display:flex;flex-wrap:wrap;width:236px;max-width:80vw;padding:6px;background:var(--c-bg3);border:1px solid var(--bd2);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.45)}
+.msg.own .emoji-picker-popup{left:auto;right:0}
+.emoji-picker-btn{border-radius:8px}.emoji-picker-btn:hover{background:var(--c-bg4)}
+.msg-skeleton{display:flex;gap:10px;padding:6px 0}
+.msg-skeleton-avatar{width:34px;height:34px;border-radius:50%;flex:none}
+.msg-skeleton-line{height:10px;width:90px;border-radius:5px;margin-bottom:6px}
+.msg-skeleton-bubble{height:38px;width:min(260px,60vw);border-radius:12px}
+.skeleton-pulse{background:var(--bd2);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.4}}
+#scrollToBottomBtn{position:absolute;right:16px;bottom:14px;width:44px;height:44px;border-radius:50%;background:var(--btn);color:#fff;display:grid;place-items:center;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+#unreadBadge{position:absolute;top:-6px;right:-4px;min-width:20px;padding:0 5px;border-radius:999px;background:var(--red);color:#fff;font-size:11px;font-weight:600;text-align:center}
+#unreadBadge:empty{display:none}
 
-  <!-- PWA -->
-  <meta name="mobile-web-app-capable" content="true" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+/* composer */
+.composer{border-top:1px solid var(--bd);background:var(--c-bg2);padding:8px 12px max(10px,env(safe-area-inset-bottom))}
+.typing-indicator{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx3);padding:0 4px 6px}
+.typing-dots{display:inline-flex;gap:3px}.typing-dots i{width:5px;height:5px;border-radius:50%;background:var(--acc-s);animation:pulse 1s infinite}
+.typing-dots i:nth-child(2){animation-delay:.15s}.typing-dots i:nth-child(3){animation-delay:.3s}
+.editor-wrap{border:1px solid var(--bd2);border-radius:12px;background:var(--c-bg);overflow:hidden}
+.editor-wrap:focus-within{border-color:var(--acc)}
+.ql-toolbar.ql-snow{border:0;border-bottom:1px solid var(--bd);padding:4px 8px}
+.ql-container.ql-snow{border:0;font:inherit}
+.ql-editor{padding:10px 12px;min-height:44px;max-height:28vh;overflow-y:auto;color:var(--tx);font-size:15px}
+.ql-editor.ql-blank::before{color:var(--tx3);font-style:normal;left:12px}
+.ql-snow .ql-stroke{stroke:var(--tx2)}.ql-snow .ql-fill{fill:var(--tx2)}.ql-snow .ql-picker{color:var(--tx2)}
+.ql-snow.ql-toolbar button:hover .ql-stroke,.ql-snow.ql-toolbar button.ql-active .ql-stroke{stroke:var(--acc-s)}
+.ql-snow.ql-toolbar button:hover .ql-fill,.ql-snow.ql-toolbar button.ql-active .ql-fill{fill:var(--acc-s)}
+.ql-snow .ql-editor pre.ql-syntax{background:var(--c-bg2);color:var(--tx)}
+.ql-snow .ql-tooltip{background:var(--c-bg3);color:var(--tx);border-color:var(--bd2);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:80}
+.ql-snow .ql-tooltip input[type=text]{background:var(--c-bg2);color:var(--tx);border-color:var(--bd2)}
+.composer-bar{display:flex;align-items:center;gap:8px;padding-top:8px}
+.as-chip{display:flex;align-items:center;gap:8px;min-width:0;flex:1;font-size:13px;color:var(--tx2)}
+#userAvatar{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600;color:#10101f;background:var(--acc)}
+#displayUsername{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.char-pill{font-size:12px;color:var(--tx3);padding:2px 8px;border-radius:999px;background:var(--c-bg4)}
+.char-pill.warn{color:var(--amber)}.char-pill.danger{color:var(--red)}
+.send-hint{font-size:12px;color:var(--tx3)}
+#sendButton{min-height:40px;padding:0 18px}
+.emoji-tray{display:flex;flex-wrap:wrap;gap:2px;padding:8px;border-radius:12px;margin-top:8px;background:var(--c-bg3);border:1px solid var(--bd)}
+.emoji-btn{width:36px;height:36px;font-size:20px;border-radius:8px}.emoji-btn:hover{background:var(--c-bg4)}
 
-  <!-- Open Graph -->
-  <meta property="og:title" content="WhisperWall" />
-  <meta property="og:description" content="Anonymous ephemeral chat." />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="assets/favicon1.png" />
+/* entry screens */
+.gate{position:fixed;inset:0;z-index:50;background:var(--c-bg);display:flex;overflow:auto;padding:24px}
+.gate-inner{margin:auto;width:100%;max-width:520px}
+.gate h1{margin:28px 0 14px;font-size:clamp(46px,9vw,84px);font-weight:200;letter-spacing:-.035em;line-height:1}
+.gate h2{margin:20px 0 8px;font-size:30px;font-weight:300;letter-spacing:-.02em}
+.lede{color:var(--tx2);max-width:36ch;margin:0 0 28px;font-size:17px}
+.join-row{display:flex;gap:8px}
+#mySpacesList{margin-top:28px;display:grid;gap:4px}
+#mySpacesList::before{content:"Your spaces";font-size:13px;font-weight:600;color:var(--tx3);margin-bottom:4px}
+.username-status{min-height:20px;font-size:13px;margin:0 0 10px}.status-bad{color:var(--red)}.status-ok{color:var(--green)}
+.back{display:inline-flex;align-items:center;gap:8px;color:var(--tx2);min-height:40px}.back:hover{color:var(--tx)}
 
-  <!-- Icons -->
-  <link rel="icon" href="assets/favicon1.png" />
-  <link rel="apple-touch-icon" href="assets/favicon1.png" />
+/* toast */
+.toast{position:fixed;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:300;display:flex;align-items:center;gap:10px;max-width:min(92vw,440px);padding:11px 14px;border-radius:12px;background:var(--c-bg3);border:1px solid var(--bd2);box-shadow:0 8px 28px rgba(0,0,0,.45)}
+.toast button{color:var(--tx3);margin-left:4px}
 
-  <!-- Performance -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-  <!-- Fonts -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  />
-
-  <!-- Font Awesome -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-  />
-
-  <!-- Quill -->
-  <link
-    rel="stylesheet"
-    href="https://cdn.quilljs.com/1.3.6/quill.snow.css"
-  />
-
-  <!-- Main CSS -->
-  <link rel="stylesheet" href="styles/index.css" />
+@media (max-width:899px){
+  #menuToggle{display:inline-grid}
+  .sidebar{position:fixed;inset:0 auto 0 0;width:min(320px,86vw);z-index:70;transform:translateX(-100%);visibility:hidden;transition:transform .25s,visibility 0s .25s}
+  .sidebar.open{transform:none;visibility:visible;transition:transform .25s}
+  .sidebar-backdrop{display:block;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s}
+  .sidebar-backdrop.visible{opacity:1;pointer-events:auto}
+  .topbar-btn-label,.send-hint,#connLabel{display:none}
+  #refreshButton{width:40px;padding:0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
+<script>try{var s=localStorage.getItem('ww_theme');if(s?s==='light':!matchMedia('(prefers-color-scheme: dark)').matches)document.body.classList.add('light')}catch(e){}</script>
 
-  <!-- Skip Link -->
-  <a href="#main-content" class="skip-link">Skip to content</a>
+<div class="app-wrap">
 
-  <!-- Screen-reader live region -->
-  <div id="srAnnounce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
-
-  <!-- Background -->
-  <div class="noise-overlay" aria-hidden="true"></div>
-
-  <!-- Sidebar Overlay (backdrop) -->
+  <aside class="sidebar" id="sidebar" aria-label="Space menu">
+    <div class="side-head">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>WhisperWall</div>
+      <button type="button" class="ib" id="sidebarClose" aria-label="Close menu"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+    </div>
+    <div class="side-scroll">
+      <section class="side-sec" aria-labelledby="h-invite">
+        <h2 id="h-invite">Invite people</h2>
+        <div class="invite-link" id="inviteLinkDisplay"></div>
+        <button type="button" class="btn" id="copyInviteBtn"><i class="fas fa-copy" aria-hidden="true"></i>Copy link</button>
+        <button type="button" class="nav-item" id="adminPanelBtn" aria-controls="adminPanel" hidden style="margin-top:8px"><i class="fas fa-shield-halved" aria-hidden="true"></i>Manage space</button>
+        <div class="admin-box" id="adminPanel" hidden>
+          <div class="field" style="margin:0"><label for="renameDomainInput">Space name</label>
+            <div class="row"><input class="inp" id="renameDomainInput" maxlength="40"><button type="button" class="btn" id="renameDomainBtn">Save</button></div></div>
+          <div class="field" style="margin:0"><label for="retentionDaysInput">Delete messages after (days)</label>
+            <div class="row"><input class="inp" id="retentionDaysInput" type="number" min="1" max="30"><button type="button" class="btn" id="retentionSaveBtn">Save</button></div></div>
+          <button type="button" class="btn" id="rotateInviteBtn">Make a new invite link</button>
+          <button type="button" class="btn" id="revokeInviteBtn">Turn off invite link</button>
+          <div class="field" style="margin:0"><label for="deleteDomainConfirmInput">Type the space name to delete it</label>
+            <input class="inp" id="deleteDomainConfirmInput" autocomplete="off"></div>
+          <button type="button" class="btn btn-danger" id="deleteDomainBtn">Delete space</button>
+        </div>
+      </section>
+      <section class="side-sec" aria-labelledby="h-people">
+        <h2 id="h-people">People here</h2>
+        <div id="onlineList" role="list"></div>
+      </section>
+      <section class="side-sec" aria-labelledby="h-look">
+        <h2 id="h-look">Chat</h2>
+        <button type="button" class="nav-item" id="wallpaperSideBtn"><i class="fas fa-image" aria-hidden="true"></i>Change wallpaper</button>
+        <button type="button" class="nav-item" id="customWallpaperBtn"><i class="fas fa-upload" aria-hidden="true"></i>Upload wallpaper</button>
+        <button type="button" class="nav-item" id="clearWallpaperBtn" hidden><i class="fas fa-trash" aria-hidden="true"></i>Remove uploaded wallpaper</button>
+        <input type="file" id="customWallpaperInput" accept="image/*" hidden>
+        <button type="button" class="nav-item" id="galleryBtn"><i class="fas fa-images" aria-hidden="true"></i>Gallery<span class="tag">Soon</span></button>
+        <button type="button" class="nav-item" id="clearChatBtn"><i class="fas fa-broom" aria-hidden="true"></i>Clear this view</button>
+      </section>
+    </div>
+    <div class="side-foot">
+      <button type="button" class="nav-item danger" id="leaveDomainBtn"><i class="fas fa-right-from-bracket" aria-hidden="true"></i>Leave space</button>
+    </div>
+  </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-  <!--
-    FIX (CRITICAL — SIDEBAR VISIBILITY):
-    The sidebar has been moved OUTSIDE of .app-wrap.
-
-    Root cause: .app-wrap has `isolation: isolate` which creates a new CSS
-    stacking context. Any child's z-index (including the sidebar's z-index:100)
-    is evaluated WITHIN that context, not at the document root.
-
-    .sidebar-backdrop lives OUTSIDE .app-wrap with z-index:90 at the document
-    root level. Since .app-wrap itself only paints at document z-index ~1,
-    the backdrop (z:90) was rendering on TOP of the entire app-wrap — including
-    the sidebar inside it — making the sidebar invisible when opened.
-
-    Moving .sidebar here (before .app-wrap, after the backdrop in DOM order,
-    but with z-index:100 at document root) means it correctly layers above the
-    backdrop (z:90) so users can see and interact with the menu.
-  -->
-  <aside class="sidebar" id="sidebar" role="complementary" aria-label="Sidebar">
-
-    <button
-      type="button"
-      class="sidebar-close"
-      id="sidebarClose"
-      aria-label="Close sidebar"
-    >
-      <i class="fas fa-xmark"></i>
-    </button>
-
-    <section class="identity-card">
-
-      <div class="id-avatar-wrap">
-        <div class="id-avatar" id="userAvatar">?</div>
-        <div class="id-status-dot"></div>
-      </div>
-
-      <div class="id-info">
-        <div class="id-name" id="displayUsername">Guest</div>
-        <div class="id-badge">Anonymous</div>
-      </div>
-
-    </section>
-
-    <div class="sidebar-divider">
-      <span>📡 online now</span>
-    </div>
-
-    <div class="online-list" id="onlineList" role="list" aria-label="Online users"></div>
-
-    <nav class="sidebar-nav" aria-label="Sidebar navigation">
-
-      <button type="button" class="nav-item" id="galleryBtn">
-        <i class="fas fa-images"></i>
-        <span>Gallery</span>
-      </button>
-
-      <button type="button" class="nav-item" id="wallpaperSideBtn">
-        <i class="fas fa-image"></i>
-        <span>Wallpaper</span>
-      </button>
-
-      <button type="button" class="nav-item" id="clearChatBtn">
-        <i class="fas fa-trash"></i>
-        <span>Clear Chat</span>
-      </button>
-
-    </nav>
-
-  </aside>
-
-  <div class="app-wrap">
-
-    <!-- HEADER -->
-    <header class="main-header">
-
-      <div class="header-left">
-
-        <button
-          type="button"
-          class="menu-btn"
-          id="menuToggle"
-          aria-label="Open menu"
-          aria-controls="sidebar"
-          aria-expanded="false"
-        >
-          <i class="fas fa-bars"></i>
-        </button>
-
-        <a href="/" class="logo">
-          <div class="logo-mark">
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-              <circle cx="11" cy="11" r="10" stroke="currentColor" stroke-width="1.5" opacity="0.35" />
-              <circle cx="11" cy="11" r="5.5" fill="currentColor" />
-              <circle cx="11" cy="11" r="2" fill="#fff" />
-            </svg>
-          </div>
-          <span class="logo-text">Whisper<em>Wall</em></span>
-        </a>
-
-      </div>
-
-      <div class="header-center">
-        <div class="status-capsule" id="connectionStatus">
-          <span class="conn-dot" id="connDot"></span>
-          <span class="conn-label" id="connLabel">Connecting...</span>
-        </div>
-      </div>
-
-      <div class="header-right">
-
-        <div class="online-pill">
-          <span class="dot-live"></span>
-          <span><b id="onlineCount">0</b> online</span>
-        </div>
-
-        <button type="button" class="hdr-btn" id="soundToggle" aria-label="Toggle sounds">
-          <i class="fas fa-volume-up" id="soundIcon"></i>
-        </button>
-
-        <button type="button" class="hdr-btn" id="themeToggle" aria-label="Toggle theme">
-          <i class="fas fa-moon"></i>
-        </button>
-
-      </div>
-
+  <main class="chat-area">
+    <header class="topbar">
+      <button type="button" class="ib" id="menuToggle" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar"><i class="fas fa-bars" aria-hidden="true"></i></button>
+      <div class="space-title"><span id="domainNameDisplay"></span></div>
+      <span class="pill" title="People online"><i class="fas fa-circle" style="font-size:7px;color:var(--green)" aria-hidden="true"></i><span id="onlineCount">0</span> online</span>
+      <span class="pill" id="connectionStatus" role="status"><span class="conn-dot" id="connDot"></span><span id="connLabel">Connecting</span></span>
+      <button type="button" class="ib" id="refreshButton" aria-label="Refresh messages"><i class="fas fa-rotate" aria-hidden="true"></i><span class="topbar-btn-label">Refresh</span></button>
+      <button type="button" class="ib" id="soundToggle" aria-label="Enable sounds"><i class="fas fa-volume-xmark" aria-hidden="true"></i></button>
+      <button type="button" class="ib" id="themeToggle" aria-label="Switch theme"><i class="fas fa-moon" aria-hidden="true"></i></button>
     </header>
 
-    <!-- MAIN -->
-    <main class="main-content" id="main-content">
-
-      <!-- CHAT -->
-      <section class="chat-area">
-
-        <div class="chat-topbar">
-
-          <div class="chat-topbar-left">
-            <div class="channel-icon" aria-hidden="true">#</div>
-
-            <div>
-              <h1 class="channel-name">general</h1>
-              <p class="channel-desc">public · anonymous · ephemeral</p>
-            </div>
-          </div>
-
-          <div class="chat-topbar-right">
-
-            <button type="button" class="topbar-btn" id="refreshButton">
-              <i class="fas fa-rotate"></i>
-              <span class="topbar-btn-label">Refresh</span>
-            </button>
-
-          </div>
-
-        </div>
-
-        <!-- Messages -->
-        <div
-          class="messages-container"
-          id="messages"
-          role="log"
-          aria-live="polite"
-          aria-label="Chat messages"
-        >
-
-          <div class="empty-state" id="emptyState">
-            <div class="empty-glyph" aria-hidden="true">
-              <i class="fas fa-ghost"></i>
-            </div>
-            <p class="empty-title">✨ Welcome To The Void ✨</p>
-            <p class="empty-sub">Be the first to whisper something.</p>
-          </div>
-
-          <button
-            type="button"
-            class="scroll-fab"
-            id="scrollToBottomBtn"
-            aria-label="Scroll to bottom"
-            hidden
-          >
-            <i class="fas fa-chevron-down" aria-hidden="true"></i>
-            <span class="unread-badge" id="unreadBadge" aria-live="polite"></span>
-          </button>
-
-        </div>
-
-        <!-- Typing -->
-        <div class="typing-bar" id="typingIndicator" hidden role="status" aria-live="polite">
-          <div class="typing-dots" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-          <span id="typingUsers">Someone is typing...</span>
-        </div>
-
-        <!-- Composer -->
-        <section class="composer" aria-label="Message composer">
-
-          <div class="editor-shell" id="editorWrap">
-            <div id="editor-container"></div>
-          </div>
-
-          <div class="composer-bar">
-
-            <div class="composer-bar-left">
-
-              <span class="char-pill" aria-label="Character count">
-                <span id="messageCharCount">0</span><span class="char-max">/2500</span>
-              </span>
-
-              <button
-                type="button"
-                class="composer-btn emoji-toggle"
-                id="emojiToggleBtn"
-                aria-label="Open emoji picker"
-                aria-expanded="false"
-              >
-                <i class="fas fa-face-smile" aria-hidden="true"></i>
-              </button>
-
-            </div>
-
-            <div class="composer-bar-right">
-
-              <kbd class="send-hint" aria-label="Keyboard shortcut to send"></kbd>
-
-              <button
-                type="button"
-                class="send-btn"
-                id="sendButton"
-                disabled
-                aria-disabled="true"
-                aria-label="Send message"
-              >
-                <i class="fas fa-paper-plane" aria-hidden="true"></i>
-                <span>Send</span>
-              </button>
-
-            </div>
-
-          </div>
-
-        </section>
-
-      </section>
-
-    </main>
-
-    <!-- Footer -->
-    <footer class="main-footer" role="contentinfo">
-      <span>© 2026 WhisperWall</span>
-      <span class="footer-dot" aria-hidden="true">·</span>
-      <span>Auto-delete after 5 days</span>
-      <span class="footer-dot" aria-hidden="true">·</span>
-      <span>100% anonymous</span>
-    </footer>
-
-  </div>
-
-  <!-- Register Modal -->
-  <div class="overlay" id="registerScreen" role="dialog" aria-modal="true" aria-label="Register" hidden>
-
-    <div class="register-card">
-
-      <div class="reg-glow" aria-hidden="true"></div>
-
-      <div class="reg-header">
-        <div class="reg-logo-mark" aria-hidden="true">
-          <svg width="24" height="24" viewBox="0 0 22 22" fill="none">
-            <circle cx="11" cy="11" r="10" stroke="#fff" stroke-width="1.5" opacity="0.5" />
-            <circle cx="11" cy="11" r="5.5" fill="#fff" />
-            <circle cx="11" cy="11" r="2" fill="rgba(124,109,250,0.8)" />
-          </svg>
-        </div>
-        <h2 class="reg-title">WhisperWall</h2>
+    <div class="messages-wrap">
+      <div id="messages" aria-live="off">
+        <div class="empty" id="emptyState" hidden><i class="fas fa-feather" aria-hidden="true"></i><p>No messages yet. Say something first.</p></div>
       </div>
-
-      <p class="reg-sub">No email. No password. No trace.</p>
-
-      <div class="reg-field">
-        <label class="reg-label" for="usernameInput">Choose your alias</label>
-
-        <div class="reg-input-wrap">
-          <span class="reg-prefix" aria-hidden="true">@</span>
-          <input
-            type="text"
-            id="usernameInput"
-            maxlength="20"
-            placeholder="shadow_fox"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            spellcheck="false"
-            aria-describedby="usernameStatusMsg usernameHint"
-          />
-        </div>
-
-        <div class="reg-meta">
-          <span
-            id="usernameStatusMsg"
-            class="username-status"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          ></span>
-          <span class="reg-counter">
-            <span id="usernameCharCount">0</span>/20
-          </span>
-        </div>
-
-        <p class="reg-hint" id="usernameHint">Letters, numbers and underscores only · 3–20 chars</p>
-      </div>
-
-      <button type="button" class="reg-btn" id="registerButton">
-        <span>Enter the wall</span>
-        <i class="fas fa-arrow-right" aria-hidden="true"></i>
-      </button>
-
-      <p class="reg-note">
-        <i class="fas fa-shield-halved" aria-hidden="true"></i>
-        Anonymous &amp; ephemeral — messages auto-delete after 5 days
-      </p>
-
+      <button type="button" id="scrollToBottomBtn" aria-label="Scroll to bottom" hidden><i class="fas fa-arrow-down" aria-hidden="true"></i><span id="unreadBadge"></span></button>
+      <div class="sr-only" id="srAnnounce" aria-live="polite"></div>
     </div>
 
-  </div>
+    <footer class="composer">
+      <div class="typing-indicator" id="typingIndicator" hidden><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="typingUsers"></span></div>
+      <div class="editor-wrap" id="editorWrap"><div id="editor-container"></div></div>
+      <div class="composer-bar">
+        <div class="as-chip"><div id="userAvatar" aria-hidden="true"></div><span id="displayUsername"></span></div>
+        <button type="button" class="ib" id="emojiToggleBtn" aria-label="Insert emoji" aria-expanded="false"><i class="far fa-face-smile" aria-hidden="true"></i></button>
+        <span class="char-pill"><span id="messageCharCount">0</span>/2500</span>
+        <span class="send-hint"></span>
+        <button type="button" class="btn btn-primary" id="sendButton" disabled aria-disabled="true"><i class="fas fa-paper-plane" aria-hidden="true"></i><span>Send</span></button>
+      </div>
+    </footer>
 
-  <!-- Toast -->
-  <div class="toast" id="notification" role="alert" aria-live="assertive" aria-atomic="true" hidden>
+    <!-- Entry screens. They live inside .chat-area so a startup error can replace them. -->
+    <section class="gate" id="landingScreen">
+      <div class="gate-inner">
+        <div class="brand"><span class="mark" aria-hidden="true"></span>WhisperWall</div>
+        <h1>Say it. Let it fade.</h1>
+        <p class="lede">Private spaces where you chat under an alias. Messages delete themselves after a few days.</p>
+        <button type="button" class="btn btn-primary" id="landingCreateBtn"><i class="fas fa-plus" aria-hidden="true"></i>Create a space</button>
+        <div class="field" style="margin:28px 0 0"><label for="landingJoinInput">Have an invite?</label>
+          <div class="join-row"><input class="inp" id="landingJoinInput" placeholder="Invite code" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="button" class="btn" id="landingJoinBtn">Join</button></div></div>
+        <div id="mySpacesList" role="group" aria-label="Your spaces" hidden></div>
+      </div>
+    </section>
 
-    <i class="fas fa-circle-info toast-icon" id="notifIcon" aria-hidden="true"></i>
+    <section class="gate" id="createDomainScreen" hidden>
+      <div class="gate-inner">
+        <button type="button" class="back" id="createDomainBackBtn"><i class="fas fa-arrow-left" aria-hidden="true"></i>Back</button>
+        <h2>Create a space</h2>
+        <p class="lede" style="margin-bottom:20px">Pick a name. You'll choose your own alias next, then share the invite link.</p>
+        <div class="field"><label for="createDomainNameInput">Space name</label>
+          <input class="inp" id="createDomainNameInput" minlength="3" maxlength="40" autocomplete="off"><p class="hint">3–40 characters.</p></div>
+        <button type="button" class="btn btn-primary" id="createDomainSubmitBtn">Create space</button>
+      </div>
+    </section>
 
-    <span class="toast-text" id="notificationText">Notification</span>
+    <section class="gate" id="joinDomainScreen" hidden>
+      <div class="gate-inner">
+        <button type="button" class="back" id="joinDomainBackBtn"><i class="fas fa-arrow-left" aria-hidden="true"></i>Back</button>
+        <h2>Join <span id="joinDomainPreviewName"></span></h2>
+        <p class="lede" style="margin-bottom:20px">Others see your alias instead of your name.</p>
+        <div class="field"><label for="joinDomainAliasInput">Your alias</label>
+          <input class="inp" id="joinDomainAliasInput" minlength="3" maxlength="20" autocomplete="off" spellcheck="false">
+          <p class="hint"><span id="joinDomainAliasCharCount">0</span>/20 · Letters, numbers and underscores</p></div>
+        <p class="username-status" id="joinDomainStatusMsg" aria-live="polite"></p>
+        <button type="button" class="btn btn-primary" id="joinDomainSubmitBtn">Join space</button>
+      </div>
+    </section>
+  </main>
+</div>
 
-    <button type="button" class="toast-close" id="notifClose" aria-label="Dismiss notification">
-      <i class="fas fa-xmark" aria-hidden="true"></i>
-    </button>
+<div class="toast" id="notification" role="status" aria-live="polite" hidden>
+  <i id="notifIcon" aria-hidden="true"></i><span id="notificationText"></span>
+  <button type="button" id="notifClose" aria-label="Dismiss"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+</div>
 
-  </div>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
 
-  <!-- Libraries -->
-  <script defer src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
-
-  <!-- Firebase -->
-  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-  <!-- App config -->
-  <script>
-  window.__WW_CONFIG = {
+<script>
+ window.__WW_CONFIG = {
     apiKey:            'AIzaSyBaKWaW1qgVxMNeCd1wdWm_o9vR81j7T1w',
     authDomain:        'WhisperWalldemo.firebaseapp.com',
     projectId:         'WhisperWalldemo',
@@ -435,6 +319,5 @@
   };
   </script>
   <script defer src="scripts/ghgh.js"></script>
-
 </body>
 </html>
