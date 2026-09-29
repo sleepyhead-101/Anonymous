@@ -1077,30 +1077,51 @@ const MySpaces = {
 ════════════════════════════════════════════════════════════════ */
 const Domains = {
 
+  /**
+   * Resolve an invite code to a space.
+   * Returns { domainId, preview } on success, or null if the link is genuinely
+   * invalid/revoked. THROWS an Error with .code === 'PERMISSION_DENIED' (or
+   * 'NETWORK') when the lookup itself failed, so callers can tell a bad link
+   * apart from a database-rules problem instead of showing the same message.
+   */
+  /**
+   * Resolve an invite code to a space preview.
+   * Reads ONLY invites/{code} — a path any signed-in (including anonymous)
+   * visitor can read by rule — so this never touches domains/{id} directly,
+   * which is members-only. Returns { domainId, preview } on success, or null
+   * if the link is genuinely invalid/revoked. THROWS an Error with
+   * .code === 'PERMISSION_DENIED' / 'NETWORK' when the lookup itself failed,
+   * so callers can tell a bad link apart from a rules/connectivity problem.
+   */
   async resolveInvite(code) {
     const clean = (code ?? '').trim().toUpperCase();
     if (!clean) return null;
 
+    const step = `invites/${clean}`;
     try {
-      const inviteSnap = await State.db.ref(`invites/${clean}`).once('value');
+      const inviteSnap = await State.db.ref(step).once('value');
       if (!inviteSnap.exists()) return null;
 
       const val = inviteSnap.val();
-      /* Guard against null val or missing domainId before using as a DB key */
       if (!val || typeof val.domainId !== 'string' || !Utils.isValidDomainId(val.domainId)) return null;
-      const { domainId } = val;
+      if (val.enabled === false) return null;
 
-      const [nameSnap, enabledSnap] = await Promise.all([
-        State.db.ref(`domains/${domainId}/name`).once('value'),
-        State.db.ref(`domains/${domainId}/inviteEnabled`).once('value'),
-      ]);
-      if (!nameSnap.exists()) return null;
-      if (enabledSnap.val() === false) return null;
+      /* name may be missing on invites created before this preview field
+         existed — fall back to a generic label rather than fail the join. */
+      const name = typeof val.name === 'string' && val.name ? val.name : 'this space';
 
-      return { domainId, preview: { name: nameSnap.val() } };
+      return { domainId: val.domainId, preview: { name } };
     } catch (err) {
-      console.warn('[Domains] resolveInvite failed:', err);
-      return null;
+      const denied = /permission[_ ]denied/i.test(String(err?.code ?? '') + ' ' + String(err?.message ?? ''));
+      console.error(`[Domains] resolveInvite failed while reading "${step}":`, err);
+      const wrapped = new Error(
+        denied
+          ? `Firebase rules blocked reading "${step}" for a visitor.`
+          : `Could not look up the invite (${err?.message ?? 'unknown error'}).`
+      );
+      wrapped.code = denied ? 'PERMISSION_DENIED' : 'NETWORK';
+      wrapped.step = step;
+      throw wrapped;
     }
   },
 
@@ -1137,20 +1158,13 @@ const Domains = {
 
     await State.db.ref().update({
       [`domains/${domainId}`]: domain,
-      [`invites/${code}`]:     { domainId },
+      /* The invite record carries its own visitor-safe preview (name + enabled)
+         so an unauthenticated-to-the-space visitor never has to read domains/
+         directly — that node is members-only. See resolveInvite(). */
+      [`invites/${code}`]:     { domainId, name, enabled: true },
     });
 
     return { domainId, domain };
-  },
-
-  async aliasAvailable(domainId, alias) {
-    if (!Utils.isValidDomainId(domainId)) return false;
-    try {
-      const snap = await State.db.ref(`domains/${domainId}/aliasIndex/${alias.toLowerCase()}`).once('value');
-      return !snap.exists();
-    } catch {
-      return false;
-    }
   },
 
   async join(domainId, rawAlias) {
@@ -1163,27 +1177,39 @@ const Domains = {
     const bannedSnap = await State.db.ref(`domains/${domainId}/banned/${State.uid}`).once('value');
     if (bannedSnap.exists()) throw new Error('You no longer have access to this space.');
 
-    /* Re-check at join time: the invite may have been revoked after the
-       join screen was shown. Existing members (owner/rejoin) are exempt. */
-    const [enabledSnap, existingSnap] = await Promise.all([
-      State.db.ref(`domains/${domainId}/inviteEnabled`).once('value'),
-      State.db.ref(`domains/${domainId}/members/${State.uid}`).once('value'),
-    ]);
-    if (enabledSnap.val() === false && !existingSnap.exists()) {
-      throw new Error('This invite link is no longer active.');
-    }
-
-    const available = await this.aliasAvailable(domainId, alias);
-    if (!available) throw new Error('That alias is taken in this space — try another.');
-
-    const ownerSnap = await State.db.ref(`domains/${domainId}/ownerUid`).once('value');
-    const role = ownerSnap.val() === State.uid ? 'owner' : 'member';
-
+    /* We deliberately do NOT pre-read domains/{id}/inviteEnabled,
+       domains/{id}/ownerUid, or domains/{id}/aliasIndex/{alias} here.
+       Each of those sits under the members-only domains/$domainId node with
+       only a child-level "auth != null" rule of its own, and a non-member's
+       read there should not be relied on. Every check those reads existed
+       for is already enforced unambiguously by the WRITE-side rules below,
+       so we attempt the write and interpret the result instead:
+         - stale/revoked invite  -> members/$uid .write requires
+           inviteEnabled === true (or being the owner), so a revoked invite
+           makes the write itself fail.
+         - correct owner/member role -> members/$uid/role .validate derives
+           the correct value server-side by comparing $uid to ownerUid, so we
+           only need to submit 'member' (a fresh join is never the owner —
+           the owner's row already exists from Domains.create()) and let the
+           server reject a wrong guess.
+         - alias uniqueness -> aliasIndex/$alias .write already rejects a
+           slot already owned by someone else. */
     const now = Date.now();
-    await State.db.ref().update({
-      [`domains/${domainId}/members/${State.uid}`]:                 { alias, role, joinedAt: now },
-      [`domains/${domainId}/aliasIndex/${alias.toLowerCase()}`]:     State.uid,
-    });
+    const role = 'member'; /* the owner's row already exists; a fresh join is never the owner */
+    try {
+      await State.db.ref().update({
+        [`domains/${domainId}/members/${State.uid}`]:                 { alias, role, joinedAt: now },
+        [`domains/${domainId}/aliasIndex/${alias.toLowerCase()}`]:     State.uid,
+      });
+    } catch (err) {
+      const denied = /permission[_ ]denied/i.test(String(err?.code ?? '') + ' ' + String(err?.message ?? ''));
+      if (!denied) throw err;
+      /* A denied write here could mean: invite revoked, alias taken by
+         someone else, or (extremely unlikely) a genuine rules misconfig.
+         We can't cheaply tell these apart without the reads we just avoided,
+         so give the most actionable, honest message. */
+      throw new Error('Could not join — the invite may have been revoked, or that alias is taken. Try a different alias or ask for a fresh invite link.');
+    }
 
     return alias;
   },
@@ -1223,7 +1249,9 @@ const Domains = {
     if (name.length < C.DOMAIN_NAME_MIN || name.length > C.DOMAIN_NAME_MAX) {
       throw new Error(`Space name must be ${C.DOMAIN_NAME_MIN}–${C.DOMAIN_NAME_MAX} characters.`);
     }
-    await State.db.ref(`domains/${State.currentDomainId}/name`).set(name);
+    const updates = { [`domains/${State.currentDomainId}/name`]: name };
+    if (State.domain?.inviteCode) updates[`invites/${State.domain.inviteCode}/name`] = name;
+    await State.db.ref().update(updates);
     State.domain.name = name;
   },
 
@@ -1244,7 +1272,7 @@ const Domains = {
     const updates = {
       [`domains/${State.currentDomainId}/inviteCode`]:    newCode,
       [`domains/${State.currentDomainId}/inviteEnabled`]: true,
-      [`invites/${newCode}`]: { domainId: State.currentDomainId },
+      [`invites/${newCode}`]: { domainId: State.currentDomainId, name: State.domain.name, enabled: true },
     };
     if (oldCode) updates[`invites/${oldCode}`] = null;
     await State.db.ref().update(updates);
@@ -1255,7 +1283,9 @@ const Domains = {
 
   async revokeInvite() {
     this.requireOwner();
-    await State.db.ref(`domains/${State.currentDomainId}/inviteEnabled`).set(false);
+    const updates = { [`domains/${State.currentDomainId}/inviteEnabled`]: false };
+    if (State.domain?.inviteCode) updates[`invites/${State.domain.inviteCode}/enabled`] = false;
+    await State.db.ref().update(updates);
     State.domain.inviteEnabled = false;
   },
 
@@ -1336,7 +1366,23 @@ const Router = {
     const inviteCode = this.parseInviteFromUrl();
 
     if (inviteCode) {
-      const resolved = await Domains.resolveInvite(inviteCode);
+      let resolved = null;
+      try {
+        resolved = await Domains.resolveInvite(inviteCode);
+      } catch (err) {
+        /* The lookup itself failed — this is NOT the same as a bad link. */
+        this.clearInviteFromUrl();
+        if (err.code === 'PERMISSION_DENIED') {
+          notify(
+            'This invite link can\'t be opened yet: the database is blocking visitors from reading it. ' +
+            'The space owner needs to update the Firebase rules (see console for details).',
+            'error', 12_000
+          );
+        } else {
+          notify('Couldn\'t check that invite link — check your connection and try again.', 'error', 8_000);
+        }
+        return this.showLanding();
+      }
       if (!resolved) {
         notify("That invite link isn't valid anymore.", 'error');
         this.clearInviteFromUrl();
@@ -1346,16 +1392,18 @@ const Router = {
       const cached = MySpaces.get(resolved.domainId);
       if (cached) {
         try {
-          await Domains.rejoin(resolved.domainId);
+          /* rejoin() returns the FULL domain record — that is what enterDomain needs */
+          const { domain: fullDomain } = await Domains.rejoin(resolved.domainId);
           this.clearInviteFromUrl();
-          return App.enterDomain(resolved.domainId, resolved.domain, cached.alias, false);
+          return App.enterDomain(resolved.domainId, fullDomain, cached.alias, false);
         } catch {
           MySpaces.remove(resolved.domainId);
         }
       }
 
       this.clearInviteFromUrl();
-      return this.showJoinScreen(resolved.domainId, resolved.domain);
+      /* A first-time visitor only has the safe preview (name) at this point. */
+      return this.showJoinScreen(resolved.domainId, resolved.preview);
     }
 
     return this.showLanding();
@@ -1407,10 +1455,30 @@ const Router = {
   },
 
   async submitJoinLink() {
-    const code = DOM.landingJoinInput?.value ?? '';
-    const resolved = await Domains.resolveInvite(code);
+    const raw  = DOM.landingJoinInput?.value ?? '';
+    /* Accept a pasted full link OR a bare code */
+    let code = raw.trim();
+    try {
+      const u = new URL(code);
+      code = u.searchParams.get('invite') ?? (u.pathname.match(/\/join\/([A-Za-z0-9]+)/)?.[1] ?? code);
+    } catch { /* not a URL — treat as a bare code */ }
+
+    if (!code) { notify('Paste an invite link or code first.', 'warn'); return; }
+
+    let resolved = null;
+    try {
+      resolved = await Domains.resolveInvite(code);
+    } catch (err) {
+      notify(
+        err.code === 'PERMISSION_DENIED'
+          ? 'The database is blocking this lookup — the space owner needs to update the Firebase rules.'
+          : 'Couldn\'t check that invite — check your connection and try again.',
+        'error', 8_000
+      );
+      return;
+    }
     if (!resolved) { notify('Invalid or expired invite code', 'error'); return; }
-    this.showJoinScreen(resolved.domainId, resolved.domain);
+    this.showJoinScreen(resolved.domainId, resolved.preview);
   },
 
   async submitJoinAlias() {
@@ -1426,7 +1494,14 @@ const Router = {
     try {
       const finalAlias = await Domains.join(pending.domainId, alias);
       this._pendingJoin = null;
-      App.enterDomain(pending.domainId, pending.domain, finalAlias, true);
+      /* pending.domain may be just the preview ({name}); enterDomain needs the
+         full record (ownerUid, inviteCode, TTL, ...). Now that we are a member
+         we are allowed to read it. */
+      let fullDomain = pending.domain;
+      if (!fullDomain || fullDomain.ownerUid === undefined) {
+        fullDomain = await Domains.getFull(pending.domainId);
+      }
+      App.enterDomain(pending.domainId, fullDomain, finalAlias, true);
     } catch (err) {
       if (DOM.joinDomainStatusMsg) {
         DOM.joinDomainStatusMsg.textContent = err.message ?? 'Could not join';
