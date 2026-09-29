@@ -1,6 +1,18 @@
 /* ═══════════════════════════════════════════════════════════════════
-   WhisperWall — scripts/app.js  (v11.1 — bug-fix + hardening pass on v11.0)
+   WhisperWall — scripts/app.js  (v11.2 — owner-role fix on v11.1)
    Firebase Realtime DB v8  ·  Anonymous auth  ·  Quill editor
+
+   CHANGES IN v11.2 vs v11.1
+   ─────────────────────────
+   · Owner keeps role 'owner' when picking an alias right after creating a
+     space. Domains.join() no longer hard-codes 'member'; the caller passes
+     the role, and when it is unknown join() tries 'member' first and falls
+     back to 'owner' (an owner rejoining through their own invite link).
+     The database rules derive the correct role server-side, so a wrong
+     guess is rejected, never accepted.
+   · Router.submitJoinAlias() detects the create-then-join case (the pending
+     record is the full domain and ownerUid === State.uid) and passes 'owner'.
+   · Removed a stale duplicated JSDoc block above Domains.resolveInvite.
 
    CHANGES IN v11.1 vs v11.0
    ─────────────────────────
@@ -1078,13 +1090,6 @@ const MySpaces = {
 const Domains = {
 
   /**
-   * Resolve an invite code to a space.
-   * Returns { domainId, preview } on success, or null if the link is genuinely
-   * invalid/revoked. THROWS an Error with .code === 'PERMISSION_DENIED' (or
-   * 'NETWORK') when the lookup itself failed, so callers can tell a bad link
-   * apart from a database-rules problem instead of showing the same message.
-   */
-  /**
    * Resolve an invite code to a space preview.
    * Reads ONLY invites/{code} — a path any signed-in (including anonymous)
    * visitor can read by rule — so this never touches domains/{id} directly,
@@ -1167,7 +1172,21 @@ const Domains = {
     return { domainId, domain };
   },
 
-  async join(domainId, rawAlias) {
+  /**
+   * Join a space with an alias.
+   *
+   * @param {string} domainId
+   * @param {string} rawAlias
+   * @param {'owner'|'member'|null} [role=null]
+   *   The role to write on the member row. Pass 'owner' when the caller knows
+   *   this uid owns the space (e.g. right after Domains.create()). When null,
+   *   'member' is tried first and 'owner' second — the database rules derive
+   *   the correct role server-side, so a wrong guess is rejected, never
+   *   accepted. The fallback covers an owner rejoining through their own
+   *   invite link, where the client only has the {name} preview.
+   * @returns {Promise<string>} the alias that was registered
+   */
+  async join(domainId, rawAlias, role = null) {
     if (!Utils.isValidDomainId(domainId)) throw new Error('Invalid space.');
     const alias = (rawAlias ?? '').trim();
     if (!C.ALIAS_RE.test(alias)) throw new Error('Letters, numbers and underscores only, 3–20 characters.');
@@ -1179,39 +1198,42 @@ const Domains = {
 
     /* We deliberately do NOT pre-read domains/{id}/inviteEnabled,
        domains/{id}/ownerUid, or domains/{id}/aliasIndex/{alias} here.
-       Each of those sits under the members-only domains/$domainId node with
-       only a child-level "auth != null" rule of its own, and a non-member's
-       read there should not be relied on. Every check those reads existed
-       for is already enforced unambiguously by the WRITE-side rules below,
+       Each of those sits under the members-only domains/$domainId node, and a
+       non-member's read there should not be relied on. Every check those reads
+       existed for is already enforced unambiguously by the WRITE-side rules,
        so we attempt the write and interpret the result instead:
          - stale/revoked invite  -> members/$uid .write requires
            inviteEnabled === true (or being the owner), so a revoked invite
            makes the write itself fail.
          - correct owner/member role -> members/$uid/role .validate derives
-           the correct value server-side by comparing $uid to ownerUid, so we
-           only need to submit 'member' (a fresh join is never the owner —
-           the owner's row already exists from Domains.create()) and let the
-           server reject a wrong guess.
+           the correct value server-side by comparing $uid to ownerUid.
          - alias uniqueness -> aliasIndex/$alias .write already rejects a
            slot already owned by someone else. */
-    const now = Date.now();
-    const role = 'member'; /* the owner's row already exists; a fresh join is never the owner */
-    try {
-      await State.db.ref().update({
-        [`domains/${domainId}/members/${State.uid}`]:                 { alias, role, joinedAt: now },
-        [`domains/${domainId}/aliasIndex/${alias.toLowerCase()}`]:     State.uid,
-      });
-    } catch (err) {
-      const denied = /permission[_ ]denied/i.test(String(err?.code ?? '') + ' ' + String(err?.message ?? ''));
-      if (!denied) throw err;
-      /* A denied write here could mean: invite revoked, alias taken by
-         someone else, or (extremely unlikely) a genuine rules misconfig.
-         We can't cheaply tell these apart without the reads we just avoided,
-         so give the most actionable, honest message. */
-      throw new Error('Could not join — the invite may have been revoked, or that alias is taken. Try a different alias or ask for a fresh invite link.');
+    const isDenied = err =>
+      /permission[_ ]denied/i.test(String(err?.code ?? '') + ' ' + String(err?.message ?? ''));
+
+    const attempt = r => State.db.ref().update({
+      [`domains/${domainId}/members/${State.uid}`]:              { alias, role: r, joinedAt: Date.now() },
+      [`domains/${domainId}/aliasIndex/${alias.toLowerCase()}`]: State.uid,
+    });
+
+    const order = role ? [role] : ['member', 'owner'];
+
+    for (const r of order) {
+      try {
+        await attempt(r);
+        return alias;
+      } catch (err) {
+        if (!isDenied(err)) throw err;
+        /* denied: try the next role, if any */
+      }
     }
 
-    return alias;
+    /* A denied write here could mean: invite revoked, alias taken by someone
+       else, or (unlikely) a rules misconfiguration. We can't cheaply tell these
+       apart without the reads we just avoided, so give the most actionable,
+       honest message. */
+    throw new Error('Could not join — the invite may have been revoked, or that alias is taken. Try a different alias or ask for a fresh invite link.');
   },
 
   async rejoin(domainId) {
@@ -1490,9 +1512,15 @@ const Router = {
     }
     const alias = DOM.joinDomainAliasInput?.value ?? '';
 
+    /* Right after "Create space", pending.domain is the FULL record, so we can
+       tell we are the owner and must keep role 'owner'. For an invite visitor it
+       is only the {name} preview, so ownerUid is undefined and role stays null
+       (Domains.join then works out the role itself). */
+    const role = pending.domain?.ownerUid === State.uid ? 'owner' : null;
+
     if (DOM.joinDomainSubmitBtn) DOM.joinDomainSubmitBtn.disabled = true;
     try {
-      const finalAlias = await Domains.join(pending.domainId, alias);
+      const finalAlias = await Domains.join(pending.domainId, alias, role);
       this._pendingJoin = null;
       /* pending.domain may be just the preview ({name}); enterDomain needs the
          full record (ownerUid, inviteCode, TTL, ...). Now that we are a member
