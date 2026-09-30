@@ -1,6 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════
-   WhisperWall — scripts/app.js  (v11.2 — owner-role fix on v11.1)
+   WhisperWall — scripts/app.js  (v11.3 — owner-only controls hidden from members)
    Firebase Realtime DB v8  ·  Anonymous auth  ·  Quill editor
+
+   CHANGES IN v11.3 vs v11.2
+   ─────────────────────────
+   · Owner-only controls (admin panel, invite link / copy / rotate / revoke,
+     rename, retention, delete space) are hidden from ordinary members, not
+     just disabled. Toggled by a body.is-owner class plus CSS, so a stray
+     `display` rule can't un-hide them. Non-owners never get the invite URL
+     written into their DOM, and their local copy of the domain drops the
+     invite code. The database rules still enforce everything server-side;
+     hiding is a UX layer, not the security boundary.
+   · Any element in your HTML can be made owner-only by adding the attribute
+     data-owner-only (useful for section headings around the invite/admin
+     controls).
 
    CHANGES IN v11.2 vs v11.1
    ─────────────────────────
@@ -718,6 +731,22 @@ function injectMobileEditorStyles() {
       transition: transform 0.2s ease, opacity 0.2s ease; will-change: transform;
     }
   `;
+  document.head.appendChild(style);
+}
+
+/* Owner-only UI: everything below is hidden unless <body> has .is-owner
+   (toggled by Moderation.refreshPanelVisibility). Add data-owner-only to any
+   extra wrapper/heading in the HTML that should also disappear for members. */
+function injectOwnerOnlyStyles() {
+  if (document.getElementById('ww-owner-only')) return;
+  const ids = ['adminPanelBtn', 'adminPanel', 'inviteLinkDisplay', 'copyInviteBtn',
+               'rotateInviteBtn', 'revokeInviteBtn', 'renameDomainInput', 'renameDomainBtn',
+               'retentionDaysInput', 'retentionSaveBtn', 'deleteDomainBtn', 'deleteDomainConfirmInput'];
+  const sel = [...ids.map(id => `#${id}`), '[data-owner-only]']
+    .map(s => `body:not(.is-owner) ${s}`).join(',\n');
+  const style = document.createElement('style');
+  style.id = 'ww-owner-only';
+  style.textContent = `${sel} { display: none !important; }`;
   document.head.appendChild(style);
 }
 
@@ -1688,6 +1717,7 @@ const Moderation = {
   },
 
   async deleteAnyMessage(msgId) {
+    if (!State.isOwner) return;   /* UI guard; the database rules enforce this too */
     try {
       await State.db.ref().update({
         [`domains/${State.currentDomainId}/messages/${msgId}`]:  null,
@@ -1700,6 +1730,7 @@ const Moderation = {
   },
 
   refreshPanelVisibility() {
+    document.body.classList.toggle('is-owner', !!State.isOwner);
     if (DOM.adminPanelBtn) DOM.adminPanelBtn.hidden = !State.isOwner;
     if (DOM.adminPanel)    DOM.adminPanel.hidden     = true;
   },
@@ -1765,6 +1796,11 @@ const Moderation = {
 const InviteUI = {
   render() {
     if (!State.domain) return;
+    if (!State.isOwner) {
+      /* Members never get the invite link in their DOM */
+      if (DOM.inviteLinkDisplay) DOM.inviteLinkDisplay.textContent = '';
+      return;
+    }
     const url = Domains.inviteUrl(State.domain.inviteCode);
     if (DOM.inviteLinkDisplay) {
       DOM.inviteLinkDisplay.textContent = State.domain.inviteEnabled === false ? 'Invite link revoked' : url;
@@ -1772,6 +1808,7 @@ const InviteUI = {
   },
   init() {
     DOM.copyInviteBtn?.addEventListener('click', async () => {
+      if (!State.isOwner) return;
       if (!State.domain || State.domain.inviteEnabled === false) { notify('No active invite link', 'warn'); return; }
       const url = Domains.inviteUrl(State.domain.inviteCode);
       try {
@@ -3092,6 +3129,8 @@ const App = {
     State.domain          = domain;
     State.alias           = alias;
     State.isOwner         = domain.ownerUid === State.uid;
+    /* Members don't need the invite code — keep it out of their local state */
+    if (!State.isOwner) { State.domain = { ...domain }; delete State.domain.inviteCode; }
 
     MySpaces.upsert(domainId, domain.name, alias);
 
@@ -3149,6 +3188,7 @@ const App = {
     State.domain           = null;
     State.alias            = null;
     State.isOwner          = false;
+    document.body.classList.remove('is-owner');
     State.renderedIds.clear();
     State._oldestMsgTs      = Infinity;
     State._initialLoadDone  = false;
@@ -3280,6 +3320,7 @@ async function boot() {
 
     patchViewport();
     injectMobileEditorStyles();
+    injectOwnerOnlyStyles();
 
     firebase.initializeApp(FIREBASE_CONFIG);
     State.db   = firebase.database();
